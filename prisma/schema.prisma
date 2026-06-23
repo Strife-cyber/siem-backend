@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -12,20 +10,168 @@ datasource db {
   provider = "postgresql"
 }
 
+// ================================================
+// Enums
+// ================================================
+
 enum UserRole {
   READER
   ANALYST
   ADMIN
 }
 
+enum SeverityLevel {
+  INFO
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+enum PlaybookMode {
+  AUTO
+  CONFIRM
+}
+
+enum ExecutionStatus {
+  PENDING
+  EXECUTED
+  ABORTED
+  FAILED
+}
+
+// ================================================
+// Models
+// ================================================
+
 model User {
-  id              Int       @default(autoincrement()) @id
-  username        String    @unique
-  password_hash   String
-  mfa_secret      String?
-  role            UserRole  @default(READER)
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-  last_login      DateTime?
-  is_active       Boolean   @default(true)
+  id            String    @id @default(uuid()) @db.Uuid
+  username      String    @unique @db.VarChar(100)
+  password_hash String    @db.VarChar(255)
+  mfa_secret    String?   @db.VarChar(255)
+  role          UserRole  @default(READER)
+  created_at    DateTime  @default(now()) @db.Timestamptz()
+  updated_at    DateTime  @updatedAt @db.Timestamptz()
+  last_login    DateTime? @db.Timestamptz()
+  is_active     Boolean   @default(true)
+
+  assigned_incidents  Incident[]          @relation("assigned_incidents")
+  triggered_playbooks PlaybookExecution[] @relation("triggered_playbooks")
+  audit_trails        AuditTrail[]
+
+  @@map("users")
+}
+
+model CorrelationRule {
+  id                String   @id @db.VarChar(50)
+  name              String   @db.VarChar(255)
+  tactic            String?  @db.VarChar(100)
+  technique         String?  @db.VarChar(100)
+  definition        Json
+  confidence_weight Int      @default(1) @db.SmallInt
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now()) @db.Timestamptz()
+  updated_at        DateTime @default(now()) @db.Timestamptz()
+
+  incidents Incident[]
+
+  @@index([is_active], name: "idx_correlation_rules_active")
+  @@map("correlation_rules")
+}
+
+model Incident {
+  id               String         @id @default(uuid()) @db.Uuid
+  rule_id          String?        @db.VarChar(50)
+  triggered_at     DateTime       @default(now()) @db.Timestamptz()
+  severity         SeverityLevel
+  confidence_score Int            @db.SmallInt
+  status           IncidentStatus @default(OPEN)
+  summary          String?        @db.Text
+  related_entities Json?
+  assigned_to      String?        @db.Uuid
+  resolved_at      DateTime?      @db.Timestamptz()
+  batch_manifest_id String?       @db.Uuid
+
+  rule            CorrelationRule? @relation(fields: [rule_id], references: [id], onDelete: SetNull)
+  assigned_user   User?            @relation("assigned_incidents", fields: [assigned_to], references: [id], onDelete: SetNull)
+  batch_manifest  BatchManifest?   @relation(fields: [batch_manifest_id], references: [id])
+  playbook_executions PlaybookExecution[]
+
+  @@index([severity, status], name: "idx_incidents_severity_status")
+  @@index([triggered_at], name: "idx_incidents_triggered_at")
+  @@map("incidents")
+}
+
+model PlaybookExecution {
+  id                   String         @id @default(uuid()) @db.Uuid
+  incident_id          String         @db.Uuid
+  playbook_name        String         @db.VarChar(255)
+  mode                 PlaybookMode   @default(AUTO)
+  status               ExecutionStatus @default(PENDING)
+  initiated_at         DateTime       @default(now()) @db.Timestamptz()
+  executed_at          DateTime?      @db.Timestamptz()
+  result_payload       Json?
+  triggered_by_user_id String?        @db.Uuid
+
+  incident          Incident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
+  triggered_by_user User?    @relation("triggered_playbooks", fields: [triggered_by_user_id], references: [id], onDelete: SetNull)
+
+  @@index([status], name: "idx_playbook_status")
+  @@map("playbook_executions")
+}
+
+model BatchManifest {
+  id           String   @id @default(uuid()) @db.Uuid
+  start_time   DateTime @db.Timestamptz()
+  end_time     DateTime @db.Timestamptz()
+  sha256_hash  String   @db.VarChar(64)
+  record_count BigInt
+  created_at   DateTime @default(now()) @db.Timestamptz()
+
+  incidents Incident[]
+
+  @@map("batch_manifests")
+}
+
+model UebaProfile {
+  id                String   @id @default(uuid()) @db.Uuid
+  user_principal    String   @unique @db.VarChar(255)
+  risk_score        Int      @default(0) @db.SmallInt
+  baseline_data     Json
+  last_calculated_at DateTime @default(now()) @db.Timestamptz()
+  anomaly_count     Int      @default(0) @db.SmallInt
+
+  @@index([risk_score], name: "idx_ueba_risk_score")
+  @@map("ueba_profiles")
+}
+
+model AuditTrail {
+  id           BigInt   @id @default(autoincrement())
+  user_id      String   @db.Uuid
+  action       String   @db.VarChar(255)
+  ip_address   String?  @db.Inet
+  user_agent   String?  @db.Text
+  metadata     Json?
+  performed_at DateTime @default(now()) @db.Timestamptz()
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([performed_at], name: "idx_audit_performed_at")
+  @@index([user_id, action], name: "idx_audit_user_action")
+  @@map("audit_trail")
+}
+
+model RetentionPolicy {
+  id            Int     @id @db.SmallInt
+  name          String  @db.VarChar(50)
+  duration_days Int
+  is_default    Boolean @default(false)
+
+  @@map("retention_policies")
 }
