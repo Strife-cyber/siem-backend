@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.3.7",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
@@ -30,9 +31,11 @@
     "@prisma/client": "^7.8.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.79.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "handlebars": "^4.7.9",
+    "ioredis": "^5.11.1",
     "nodemailer": "^9.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -91,6 +94,7 @@
     "@prisma/engines@7.8.0": true,
     "prisma@7.8.0": true,
     "unrs-resolver@1.12.2": true,
-    "bcrypt@6.0.0": true
+    "bcrypt@6.0.0": true,
+    "msgpackr-extract@3.0.4": true
   }
 }
