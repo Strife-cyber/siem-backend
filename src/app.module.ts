@@ -4,7 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
-import { MailModule } from './mail/mail.module';
+
 import { LogsModule } from './logs/logs.module';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -23,7 +23,6 @@ import { ReportsModule } from './reports/reports.module';
   imports: [
     PrismaModule,
     ElasticsearchModule,
-    MailModule,
     AuthModule,
     LogsModule,
     BullModule.forRoot({

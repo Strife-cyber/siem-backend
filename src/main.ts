@@ -28,6 +28,15 @@ async function bootstrap() {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       'BearerAuth',
     )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'X-API-Key',
+        in: 'header',
+        description: 'API key for collector agents',
+      },
+      'X-API-Key',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -175,3 +175,16 @@ model RetentionPolicy {
 
   @@map("retention_policies")
 }
+
+model ApiKey {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar(100)
+  key_hash   String   @db.VarChar(255)
+  key_prefix String   @db.VarChar(8)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz()
+  last_used_at DateTime? @db.Timestamptz()
+
+  @@unique([key_hash], name: "api_key_hash_unique")
+  @@map("api_keys")
+}
