@@ -1,21 +1,97 @@
+name: siem-backend
+
 services:
+  postgres:
+    image: postgres:latest
+    container_name: siem-postgres
+    environment:
+      POSTGRES_DB: siem_db
+      POSTGRES_USER: siem
+      POSTGRES_PASSWORD: siem_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U siem -d siem_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - siem-network
+
   redis:
     image: redis:7-alpine
-    container_name: redis
+    container_name: siem-redis
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
-      
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - siem-network
+
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
-    container_name: elasticsearch
+    image: elasticsearch:9.4.2
+    container_name: siem-elasticsearch
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - '9200:9200'
+      - '9300:9300'
     volumes:
-      - elastic_data:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9200/_cluster/health']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - siem-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: siem-app
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://siem:siem_password@postgres:5432/siem_db?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      JWT_SECRET: change-this-to-a-secure-random-string-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+    volumes:
+      - app_data:/usr/src/app
+    networks:
+      - siem-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  app_data:
+    driver: local
+
+networks:
+  siem-network:
+    driver: bridge

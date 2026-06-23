@@ -10,6 +10,14 @@ import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { BullModule } from '@nestjs/bullmq';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { IncidentsModule } from './incidents/incidents.module';
+import { RulesModule } from './rules/rules.module';
+import { SoarModule } from './soar/soar.module';
+import { UebaModule } from './ueba/ueba.module';
+import { AdminModule } from './admin/admin.module';
+import { AuditModule } from './audit/audit.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -24,6 +32,14 @@ import { BullModule } from '@nestjs/bullmq';
         port: Number(process.env.REDIS_PORT) || 6379,
       },
     }),
+    DashboardModule,
+    IncidentsModule,
+    RulesModule,
+    SoarModule,
+    UebaModule,
+    AdminModule,
+    AuditModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [
