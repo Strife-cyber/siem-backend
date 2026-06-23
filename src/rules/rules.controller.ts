@@ -18,43 +18,46 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../generated/prisma/enums';
+import { RulesService } from './rules.service';
 import { CreateCorrelationRuleDto } from './dto/correlation-rule.dto';
 
 @ApiTags('Rules')
 @ApiBearerAuth('BearerAuth')
 @Controller('rules')
 export class RulesController {
+  constructor(private readonly rulesService: RulesService) {}
+
   @Get()
   @ApiOperation({ summary: 'List all correlation rules (FR-03.1)' })
   @ApiOkResponse({ description: 'List of rules' })
-  listRules() {
-    return [];
+  async listRules() {
+    return this.rulesService.findAll();
   }
 
   @Post()
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create a new correlation rule (ADMIN only)' })
   @ApiCreatedResponse({ description: 'Rule created' })
-  createRule(@Body() _dto: CreateCorrelationRuleDto) {
-    return {};
+  async createRule(@Body() dto: CreateCorrelationRuleDto) {
+    return this.rulesService.create(dto);
   }
 
   @Get(':ruleId')
   @ApiOperation({ summary: 'Get a specific rule' })
   @ApiOkResponse({ description: 'Rule found' })
-  getRule(@Param('ruleId') _ruleId: string) {
-    return {};
+  async getRule(@Param('ruleId') ruleId: string) {
+    return this.rulesService.findOne(ruleId);
   }
 
   @Put(':ruleId')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update an existing rule (ADMIN only)' })
   @ApiOkResponse({ description: 'Updated' })
-  updateRule(
-    @Param('ruleId') _ruleId: string,
-    @Body() _dto: CreateCorrelationRuleDto,
+  async updateRule(
+    @Param('ruleId') ruleId: string,
+    @Body() dto: CreateCorrelationRuleDto,
   ) {
-    return {};
+    return this.rulesService.update(ruleId, dto);
   }
 
   @Delete(':ruleId')
@@ -62,7 +65,7 @@ export class RulesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Deactivate/Delete a rule (ADMIN only)' })
   @ApiOkResponse({ description: 'Deleted successfully' })
-  deleteRule(@Param('ruleId') _ruleId: string) {
-    return;
+  async deleteRule(@Param('ruleId') ruleId: string) {
+    await this.rulesService.remove(ruleId);
   }
 }

@@ -1,5 +1,5 @@
-import { IsString, IsUUID, IsEnum, IsOptional } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsUUID, IsEnum } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class PlaybookExecutionDto {
   @ApiProperty()

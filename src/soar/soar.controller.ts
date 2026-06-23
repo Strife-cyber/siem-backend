@@ -6,28 +6,28 @@ import {
   ApiOkResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
+import { SoarService } from './soar.service';
 import { PlaybookExecutionDto, AbortPlaybookDto } from './dto/soar.dto';
 
 @ApiTags('SOAR')
 @ApiBearerAuth('BearerAuth')
 @Controller('soar')
 export class SoarController {
+  constructor(private readonly soarService: SoarService) {}
+
   @Post('execute')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Execute a SOAR playbook (FR-04.2)' })
   @ApiCreatedResponse({ description: 'Playbook queued' })
-  async executePlaybook(@Body() _dto: PlaybookExecutionDto) {
-    return {
-      execution_id: '00000000-0000-0000-0000-000000000000',
-      status: 'PENDING',
-    };
+  async executePlaybook(@Body() dto: PlaybookExecutionDto) {
+    return this.soarService.executePlaybook(dto);
   }
 
   @Post('abort')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Abort a pending CONFIRM playbook (FR-04.2)' })
   @ApiOkResponse({ description: 'Aborted successfully' })
-  async abortPlaybook(@Body() _dto: AbortPlaybookDto) {
-    return { status: 'aborted' };
+  async abortPlaybook(@Body() dto: AbortPlaybookDto) {
+    return this.soarService.abortPlaybook(dto.execution_id);
   }
 }

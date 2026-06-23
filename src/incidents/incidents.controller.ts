@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -6,12 +6,15 @@ import {
   ApiOkResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { IncidentsService } from './incidents.service';
 import { IncidentUpdateDto } from './dto/incident-update.dto';
 
 @ApiTags('Incidents')
 @ApiBearerAuth('BearerAuth')
 @Controller('incidents')
 export class IncidentsController {
+  constructor(private readonly incidentsService: IncidentsService) {}
+
   @Get()
   @ApiOperation({ summary: 'List all incidents with filters' })
   @ApiQuery({
@@ -27,24 +30,29 @@ export class IncidentsController {
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @ApiOkResponse({ description: 'List of incidents' })
-  async listIncidents() {
-    return [];
+  async listIncidents(
+    @Query('status') status?: string,
+    @Query('severity') severity?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.incidentsService.findAll({ status, severity, from, to });
   }
 
   @Get(':incidentId')
   @ApiOperation({ summary: 'Get full incident details' })
   @ApiOkResponse({ description: 'Incident details' })
-  async getIncident(@Param('incidentId') _incidentId: string) {
-    return {};
+  async getIncident(@Param('incidentId') incidentId: string) {
+    return this.incidentsService.findOne(incidentId);
   }
 
   @Patch(':incidentId')
   @ApiOperation({ summary: 'Update incident status (ANALYST or ADMIN only)' })
   @ApiOkResponse({ description: 'Updated incident' })
   async updateIncident(
-    @Param('incidentId') _incidentId: string,
-    @Body() _dto: IncidentUpdateDto,
+    @Param('incidentId') incidentId: string,
+    @Body() dto: IncidentUpdateDto,
   ) {
-    return {};
+    return this.incidentsService.update(incidentId, dto);
   }
 }

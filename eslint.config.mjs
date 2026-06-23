@@ -29,6 +29,11 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/require-await': 'off',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
@@ -39,6 +44,17 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
+    },
+  },
+  {
+    files: [
+      'src/**/*.controller.ts',
+      'src/**/*.service.ts',
+      'src/**/*.dto.ts',
+      'src/**/*.module.ts',
+    ],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
     },
   },
 );

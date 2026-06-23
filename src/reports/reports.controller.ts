@@ -24,7 +24,7 @@ export class ReportsController {
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Generate PDF/Excel report (FR-05.5)' })
   @ApiCreatedResponse({ description: 'Report generation queued' })
-  async generateReport(@Body() _dto: ReportGenerationDto) {
+  generateReport(@Body() _dto: ReportGenerationDto) {
     return {
       job_id: '00000000-0000-0000-0000-000000000000',
       estimated_time_seconds: 30,
@@ -34,7 +34,7 @@ export class ReportsController {
   @Get('download/:jobId')
   @ApiOperation({ summary: 'Download generated report' })
   @ApiOkResponse({ description: 'File download' })
-  async downloadReport(@Param('jobId') _jobId: string) {
+  downloadReport(@Param('jobId') _jobId: string) {
     return {};
   }
 }
