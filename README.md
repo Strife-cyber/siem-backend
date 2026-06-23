@@ -1,98 +1,288 @@
+# Smart SIEM CTU — Backend API
+
 <p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+  <strong>Security Information and Event Management System</strong><br />
+  Log ingestion, correlation, SOAR automation, UEBA, forensics, and reporting.
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## Overview
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+The CTU (Counter-Terrorism Unit) Smart SIEM backend ingests security logs from multiple sources, normalizes them into a **Golden Schema**, stores them in **Elasticsearch** for full-text search, and correlates events against **MITRE ATT&CK** rules to detect threats. Detected incidents trigger **SOAR playbooks** (automated response), while **UEBA** profiles track user behavior anomalies.
 
-## Description
+Built with **NestJS 11**, **Prisma 7** (PostgreSQL), **Elasticsearch**, and **BullMQ** (Redis).
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Architecture
 
-## Project setup
-
-```bash
-$ npm install
+```
+┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
+│ Collectors  │────▶│  API /auth   │────▶│ PostgreSQL       │
+│ (Agents)    │     │  /logs       │     │ (users, rules,   │
+└─────────────┘     │  /incidents  │     │  incidents,       │
+                    │  /soar       │     │  playbooks,       │
+                    │  /ueba       │     │  audit)           │
+                    │  /admin      │     └──────────────────┘
+                    │  /audit      │
+                    │  /reports    │     ┌──────────────────┐
+                    │  /dashboard  │────▶│ Elasticsearch    │
+                    └──────┬───────┘     │ (log storage,    │
+                           │            │  full-text        │
+                           ▼             │  search)          │
+                    ┌──────────────┐     └──────────────────┘
+                    │ BullMQ       │
+                    │ (Redis)      │     ┌──────────────────┐
+                    │ Logs queue   │────▶│ LogsProcessor    │
+                    └──────────────┘     │ → normalize      │
+                                         │ → index in ES    │
+                                         └──────────────────┘
 ```
 
-## Compile and run the project
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| **Runtime** | Node.js 20, TypeScript 5.9 |
+| **Framework** | NestJS 11 |
+| **ORM** | Prisma 7 (`@prisma/client` with `@prisma/adapter-pg`) |
+| **Database (operational)** | PostgreSQL 16 — users, rules, incidents, playbooks, UEBA, audit |
+| **Database (logs)** | Elasticsearch 9.x — normalized logs, full-text search, forensics |
+| **Queue** | BullMQ 5 + Redis 7 — async log normalization |
+| **Auth** | JWT (Passport), bcryptjs, RBAC |
+| **API Docs** | Swagger / OpenAPI 3.0 via `@nestjs/swagger` |
+| **Validation** | class-validator, class-transformer |
+| **Email** | Nodemailer + Handlebars templates |
+| **Containerization** | Docker, Docker Compose |
+
+## Prerequisites
+
+- Node.js >= 20
+- npm >= 10
+- Docker Desktop (for local services)
+
+## Quick Start
+
+### 1. Clone and install
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+git clone <repo-url> siem-backend
+cd siem-backend
+npm install
 ```
 
-## Run tests
+### 2. Start infrastructure services
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d postgres redis elasticsearch
 ```
 
-## Deployment
+### 3. Configure environment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Create a `.env` file:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+```env
+DATABASE_URL="postgresql://siem:siem_password@localhost:5432/siem_db?schema=public"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+ELASTICSEARCH_URL=http://localhost:9200
+JWT_SECRET=change-this-to-a-secure-random-string-in-production
+```
+
+### 4. Run database migrations
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npx prisma migrate dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 5. Start the application
 
-## Resources
+```bash
+npm run start:dev
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+The API is available at `http://localhost:3000/api/v1`.  
+Swagger docs at `http://localhost:3000/api/docs`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Docker (full stack)
 
-## Support
+```bash
+docker compose up --build
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+This starts all 4 services: `postgres`, `redis`, `elasticsearch`, and `app`.  
+The `app` service automatically runs `prisma migrate deploy` on startup.
 
-## Stay in touch
+## API Documentation
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Once running, visit **`/api/docs`** for the interactive Swagger UI.
 
-## License
+### API Endpoints
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Tag | Method | Endpoint | Description | Auth |
+|-----|--------|----------|-------------|------|
+| **Authentication** | POST | `/auth/login` | Login with username/password | Public |
+| | POST | `/auth/register` | Register a new user | Public |
+| | GET | `/auth/profile` | Get current user profile | JWT |
+| **Dashboard** | GET | `/dashboard/stats` | Crisis room statistics | JWT |
+| | GET | `/dashboard/timeline` | Timeline chart data | JWT |
+| **Logs** | POST | `/logs` | Ingest raw logs | JWT |
+| | GET | `/logs/search` | Full-text log search | JWT |
+| **Incidents** | GET | `/incidents` | List incidents (filterable) | JWT |
+| | GET | `/incidents/:id` | Incident details | JWT |
+| | PATCH | `/incidents/:id` | Update incident status | JWT |
+| **Rules (MITRE)** | GET | `/rules` | List correlation rules | JWT |
+| | POST | `/rules` | Create rule | ADMIN |
+| | PUT | `/rules/:id` | Update rule | ADMIN |
+| | DELETE | `/rules/:id` | Delete rule | ADMIN |
+| **SOAR** | POST | `/soar/execute` | Execute a playbook | JWT |
+| | POST | `/soar/abort` | Abort a playbook | JWT |
+| **UEBA** | GET | `/ueba/users` | List risk profiles | JWT |
+| | GET | `/ueba/users/:principal` | Get user profile | JWT |
+| **Admin** | GET/POST | `/admin/users` | List / Create users | ADMIN |
+| | PUT/DELETE | `/admin/users/:id` | Update / Deactivate user | ADMIN |
+| | GET/PUT | `/admin/retention` | Retention policies | ADMIN |
+| **Audit** | GET | `/audit/trail` | Audit trail logs | JWT |
+| | GET | `/audit/integrity/:id` | Verify batch integrity | JWT |
+| **Reports** | POST | `/reports/generate` | Generate PDF/Excel report | JWT |
+| | GET | `/reports/download/:id` | Download report | JWT |
+
+### Authentication
+
+All endpoints except `/auth/login` and `/auth/register` require a **Bearer JWT token**:
+
+```
+Authorization: Bearer <access_token>
+```
+
+**Role-Based Access Control (RBAC):**
+
+| Role | Permissions |
+|------|-------------|
+| `READER` | View dashboards, incidents, logs, rules |
+| `ANALYST` | All READER permissions + update incidents, execute playbooks |
+| `ADMIN` | All ANALYST permissions + manage users, create/update/delete rules, configure retention |
+
+## Project Structure
+
+```
+src/
+├── @types/                    # Type declarations (Express Request)
+├── auth/                      # Authentication module
+│   ├── decorators/            # @Public(), @CurrentUser(), @Roles()
+│   ├── dto/                   # SignInDto, SignUpDto
+│   ├── guards/                # JwtAuthGuard, RolesGuard
+│   ├── strategies/            # LocalStrategy, JwtStrategy
+│   ├── auth.controller.ts
+│   ├── auth.module.ts
+│   └── auth.service.ts
+├── prisma/                    # Prisma module (global)
+│   ├── prisma.module.ts
+│   └── prisma.service.ts
+├── elasticsearch/             # Elasticsearch module (global)
+│   ├── elasticsearch.module.ts
+│   └── elasticsearch.service.ts
+├── logs/                      # Logs ingestion & search
+│   ├── dto/                   # CreateLogDto, SearchLogsDto
+│   ├── interfaces/            # NormalizedLog, LogSearchQuery
+│   ├── processors/            # LogsProcessor (BullMQ worker)
+│   ├── logs.controller.ts
+│   ├── logs.module.ts
+│   └── logs.service.ts
+├── dashboard/                 # Dashboard (crisis room stats)
+│   ├── dto/
+│   ├── dashboard.controller.ts
+│   ├── dashboard.module.ts
+│   └── dashboard.service.ts
+├── incidents/                 # Incident lifecycle
+│   ├── dto/
+│   ├── incidents.controller.ts
+│   ├── incidents.module.ts
+│   └── incidents.service.ts
+├── rules/                     # MITRE ATT&CK correlation rules
+│   ├── dto/
+│   ├── rules.controller.ts
+│   ├── rules.module.ts
+│   └── rules.service.ts
+├── soar/                      # SOAR playbook execution
+│   ├── dto/
+│   ├── soar.controller.ts
+│   ├── soar.module.ts
+│   └── soar.service.ts
+├── ueba/                      # User behavior analytics
+│   ├── ueba.controller.ts
+│   ├── ueba.module.ts
+│   └── ueba.service.ts
+├── admin/                     # Admin (user & retention management)
+│   ├── dto/
+│   ├── admin.controller.ts
+│   ├── admin.module.ts
+│   └── admin.service.ts
+├── audit/                     # Audit trail & integrity
+│   ├── audit.controller.ts
+│   ├── audit.module.ts
+│   └── audit.service.ts
+├── reports/                   # Report generation
+│   ├── dto/
+│   ├── reports.controller.ts
+│   └── reports.module.ts
+├── mail/                      # Email notifications
+│   ├── mail.module.ts
+│   └── mail.service.ts
+├── app.module.ts
+├── app.controller.ts
+└── main.ts
+```
+
+## Database
+
+### PostgreSQL (Prisma)
+
+The schema is defined in `prisma/schema.prisma` and includes:
+
+- **users** — Authentication, MFA, RBAC
+- **correlation_rules** — MITRE ATT&CK rules with JSON definition
+- **incidents** — Security incidents linked to rules and users
+- **playbook_executions** — SOAR automation tracking
+- **batch_manifests** — SHA-256 chain of custody (FR-02.3)
+- **ueba_profiles** — Behavioral baseline and risk scoring
+- **audit_trail** — Full action journaling with IP logging
+- **retention_policies** — Data lifecycle configuration
+
+### Elasticsearch
+
+Log index template (`ctu-logs-template`) with Golden Schema:
+
+- `collected_at`, `normalized_at` (date)
+- `source_type`, `hostname`, `user_principal` (keyword)
+- `source_ip`, `destination_ip` (ip)
+- `source_port`, `destination_port` (integer)
+- `event_taxonomy`, `action`, `outcome` (keyword)
+- `severity` (byte)
+- `raw_message` (text with custom analyzer)
+- `tags` (keyword array)
+- `ingestion_hash` (keyword — SHA-256 for integrity)
+- ILM policy: 30-day retention with rollover at 50GB / 7 days
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run start:dev` | Start in watch mode |
+| `npm run build` | Compile TypeScript |
+| `npm run start:prod` | Start production build |
+| `npm run lint` | Lint source files |
+| `npm run format` | Format with Prettier |
+| `npm run test` | Run unit tests |
+| `npm run test:e2e` | Run end-to-end tests |
+| `npx prisma generate` | Regenerate Prisma Client |
+| `npx prisma migrate dev` | Create & apply migrations |
+| `npx prisma migrate deploy` | Apply pending migrations (prod) |
+| `npx prisma studio` | Open Prisma Studio (GUI) |
+| `npx prisma db seed` | Seed database |
+
+## Security
+
+- **Password hashing**: bcrypt with 12 salt rounds via `bcryptjs`
+- **JWT**: 24-hour expiration, configurable secret via `JWT_SECRET`
+- **Global auth guard**: All routes protected by default; `@Public()` opt-out
+- **Role guard**: `@Roles(UserRole.ADMIN)` restricts access
+- **Input validation**: `class-validator` with whitelist on all DTOs
+- **Audit trail**: All user actions logged in `audit_trail` table
