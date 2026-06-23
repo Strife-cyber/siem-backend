@@ -5,21 +5,23 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { MailModule } from './mail/mail.module';
+import { LogsModule } from './logs/logs.module';
+import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { LogsModule } from './logs/logs.module';
 import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     PrismaModule,
+    ElasticsearchModule,
     MailModule,
     AuthModule,
     LogsModule,
     BullModule.forRoot({
       connection: {
-        host: 'localhost', // TODO: Change this to your Redis Environment Variable
-        port: 6379,
+        host: process.env.REDIS_HOST || 'localhost',
+        port: Number(process.env.REDIS_PORT) || 6379,
       },
     }),
   ],
