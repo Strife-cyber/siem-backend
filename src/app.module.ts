@@ -18,6 +18,7 @@ import { UebaModule } from './ueba/ueba.module';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { ReportsModule } from './reports/reports.module';
+import { CorrelationModule } from './correlation/correlation.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ReportsModule } from './reports/reports.module';
     AdminModule,
     AuditModule,
     ReportsModule,
+    CorrelationModule,
   ],
   controllers: [AppController],
   providers: [

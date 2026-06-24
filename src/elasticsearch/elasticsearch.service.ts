@@ -30,9 +30,6 @@ export class ElasticsearchService implements OnModuleInit {
     );
   }
 
-  /**
-   * FR-02.2: Create/update the ILM policy for 30-day retention.
-   */
   private async ensureIlmPolicy() {
     try {
       await this.client.ilm.putLifecycle({
@@ -65,9 +62,6 @@ export class ElasticsearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * FR-02.1 / FR-05.2: Create/update the index template with Golden Schema mappings.
-   */
   private async ensureIndexTemplate() {
     try {
       await this.client.indices.putIndexTemplate({
@@ -115,6 +109,20 @@ export class ElasticsearchService implements OnModuleInit {
               tags: { type: 'keyword' },
               ingestion_hash: { type: 'keyword' },
               confidence_score: { type: 'byte' },
+              // ---- Enrichment fields (parsed from raw_message) ----
+              event_id: { type: 'integer' },
+              logon_type: { type: 'byte' },
+              target_user: { type: 'keyword' },
+              failure_reason: { type: 'keyword' },
+              source_network_address: { type: 'ip' },
+              workstation: { type: 'keyword' },
+              auth_package: { type: 'keyword' },
+              service_name: { type: 'keyword' },
+              bytes_sent: { type: 'long' },
+              bytes_recv: { type: 'long' },
+              direction: { type: 'keyword' },
+              protocol: { type: 'keyword' },
+              duration_seconds: { type: 'integer' },
             },
             _meta: {
               version: '1.0',
@@ -129,9 +137,6 @@ export class ElasticsearchService implements OnModuleInit {
     }
   }
 
-  /**
-   * Create the initial write index with the alias.
-   */
   private async ensureInitialIndex() {
     try {
       const exists = await this.client.indices.exists({ index: INITIAL_INDEX });
@@ -146,14 +151,40 @@ export class ElasticsearchService implements OnModuleInit {
           `Initial index "${INITIAL_INDEX}" created with alias "${LOGS_ALIAS}"`,
         );
       }
-    } catch (error) {
-      this.logger.error('Failed to create initial index', error);
+
+      // Apply enrichment fields mapping to the existing index
+      // (template only affects NEW indices, not existing ones)
+      await this.client.indices.putMapping({
+        index: INITIAL_INDEX,
+        properties: {
+          event_id: { type: 'integer' },
+          logon_type: { type: 'byte' },
+          target_user: { type: 'keyword' },
+          failure_reason: { type: 'keyword' },
+          source_network_address: { type: 'ip' },
+          workstation: { type: 'keyword' },
+          auth_package: { type: 'keyword' },
+          service_name: { type: 'keyword' },
+          bytes_sent: { type: 'long' },
+          bytes_recv: { type: 'long' },
+          direction: { type: 'keyword' },
+          protocol: { type: 'keyword' },
+          duration_seconds: { type: 'integer' },
+        },
+      });
+      this.logger.log(
+        `Enrichment fields mapping applied to "${INITIAL_INDEX}"`,
+      );
+    } catch (error: any) {
+      // putMapping returns 400 if fields already exist — not a problem
+      if (error?.meta?.statusCode === 400) {
+        this.logger.log('Enrichment fields already mapped (no change needed)');
+      } else {
+        this.logger.error('Failed to update index mapping', error);
+      }
     }
   }
 
-  /**
-   * Bulk index normalized logs into Elasticsearch.
-   */
   async bulkInsert(logs: NormalizedLog[]): Promise<{ indexed: number }> {
     if (logs.length === 0) {
       return { indexed: 0 };
@@ -168,6 +199,11 @@ export class ElasticsearchService implements OnModuleInit {
 
     if (response.errors) {
       const errorItems = response.items.filter((item) => item.index?.error);
+      for (const item of errorItems.slice(0, 5)) {
+        this.logger.warn(
+          `ES bulk error: ${item.index?.error?.reason ?? 'unknown'} (type: ${item.index?.error?.type ?? 'unknown'})`,
+        );
+      }
       this.logger.warn(
         `Bulk insert completed with ${errorItems.length} error(s) out of ${logs.length} documents`,
       );
@@ -176,9 +212,6 @@ export class ElasticsearchService implements OnModuleInit {
     return { indexed: logs.length };
   }
 
-  /**
-   * FR-05.2 / S6: Search logs with multi-criteria filtering and full-text search.
-   */
   async search(query: LogSearchQuery) {
     const must: Record<string, unknown>[] = [];
     const filter: Record<string, unknown>[] = [];
@@ -258,9 +291,6 @@ export class ElasticsearchService implements OnModuleInit {
     };
   }
 
-  /**
-   * Get the underlying ES client for advanced operations.
-   */
   getClient(): Client {
     return this.client;
   }

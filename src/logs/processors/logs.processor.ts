@@ -4,8 +4,9 @@ import { createHash } from 'node:crypto';
 import { ElasticsearchService } from '../../elasticsearch/elasticsearch.service';
 import type { NormalizedLog } from '../interfaces/normalized-log.interface';
 import type { CreateLogDto } from '../dto/create-log.dto';
+import { enrichLog } from '../enrichers/enricher.registry';
 
-@Processor('logs')
+@Processor('logs', { concurrency: 10 })
 export class LogsProcessor extends WorkerHost {
   constructor(private readonly elasticsearchService: ElasticsearchService) {
     super();
@@ -14,8 +15,14 @@ export class LogsProcessor extends WorkerHost {
   async process(job: Job<{ logs: CreateLogDto[] }>) {
     switch (job.name) {
       case 'normalize': {
-        const normalized = this.normalizeLogs(job.data.logs as CreateLogDto[]);
-        await this.elasticsearchService.bulkInsert(normalized);
+        const rawLogs = job.data.logs;
+        const normalized = this.normalizeLogs(rawLogs);
+        // Enrich: parse raw_message to extract structured fields
+        const enriched = normalized.map((log) => ({
+          ...log,
+          ...enrichLog(log),
+        }));
+        await this.elasticsearchService.bulkInsert(enriched);
         break;
       }
     }

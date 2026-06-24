@@ -6,16 +6,18 @@ import {
   Min,
   IsObject,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateCorrelationRuleDto {
-  @ApiProperty({ example: 'R001' })
+export class UpdateCorrelationRuleDto {
+  @ApiPropertyOptional({ example: 'SSH Brute Force' })
+  @IsOptional()
   @IsString()
-  id!: string;
+  name?: string;
 
-  @ApiProperty({ example: 'SSH Brute Force' })
-  @IsString()
-  name!: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  definition?: Record<string, unknown>;
 
   @ApiPropertyOptional({ example: 'TA0001' })
   @IsOptional()
@@ -26,12 +28,6 @@ export class CreateCorrelationRuleDto {
   @IsOptional()
   @IsString()
   technique?: string;
-
-  @ApiProperty({
-    description: 'JSON rule definition (threshold, window, filters)',
-  })
-  @IsObject()
-  definition!: Record<string, unknown>;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

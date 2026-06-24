@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  Patch,
   Delete,
   Param,
   Body,
@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../generated/prisma/enums';
 import { RulesService } from './rules.service';
 import { CreateCorrelationRuleDto } from './dto/correlation-rule.dto';
+import { UpdateCorrelationRuleDto } from './dto/update-correlation-rule.dto';
 
 @ApiTags('Rules')
 @ApiBearerAuth('BearerAuth')
@@ -49,13 +50,13 @@ export class RulesController {
     return this.rulesService.findOne(ruleId);
   }
 
-  @Put(':ruleId')
+  @Patch(':ruleId')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update an existing rule (ADMIN only)' })
   @ApiOkResponse({ description: 'Updated' })
   async updateRule(
     @Param('ruleId') ruleId: string,
-    @Body() dto: CreateCorrelationRuleDto,
+    @Body() dto: UpdateCorrelationRuleDto,
   ) {
     return this.rulesService.update(ruleId, dto);
   }
