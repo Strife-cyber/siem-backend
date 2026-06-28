@@ -70,6 +70,7 @@ services:
       REDIS_PORT: 6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
       JWT_SECRET: change-this-to-a-secure-random-string-in-production
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     depends_on:
       postgres:
         condition: service_healthy
