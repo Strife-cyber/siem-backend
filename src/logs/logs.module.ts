@@ -9,6 +9,9 @@ import { LogsProcessor } from './processors/logs.processor';
     BullModule.registerQueue({
       name: 'logs',
     }),
+    BullModule.registerQueue({
+      name: 'ueba',
+    }),
   ],
   controllers: [LogsController],
   providers: [LogsService, LogsProcessor],

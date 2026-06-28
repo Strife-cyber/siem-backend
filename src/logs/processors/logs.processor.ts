@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { Job, Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 import { createHash } from 'node:crypto';
 import { ElasticsearchService } from '../../elasticsearch/elasticsearch.service';
 import type { NormalizedLog } from '../interfaces/normalized-log.interface';
@@ -8,7 +9,10 @@ import { enrichLog } from '../enrichers/enricher.registry';
 
 @Processor('logs', { concurrency: 10 })
 export class LogsProcessor extends WorkerHost {
-  constructor(private readonly elasticsearchService: ElasticsearchService) {
+  constructor(
+    private readonly elasticsearchService: ElasticsearchService,
+    @InjectQueue('ueba') private readonly uebaQueue: Queue,
+  ) {
     super();
   }
 
@@ -17,12 +21,22 @@ export class LogsProcessor extends WorkerHost {
       case 'normalize': {
         const rawLogs = job.data.logs;
         const normalized = this.normalizeLogs(rawLogs);
-        // Enrich: parse raw_message to extract structured fields
         const enriched = normalized.map((log) => ({
           ...log,
           ...enrichLog(log),
         }));
         await this.elasticsearchService.bulkInsert(enriched);
+
+        // Push each normalized log to UEBA for behavioral scoring
+        for (const log of normalized) {
+          if (log.user_principal) {
+            await this.uebaQueue
+              .add('score', { log }, { attempts: 3 })
+              .catch(() => {
+                // Non-critical: UEBA scoring is best-effort
+              });
+          }
+        }
         break;
       }
     }

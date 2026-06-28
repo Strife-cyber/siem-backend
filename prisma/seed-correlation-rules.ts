@@ -83,6 +83,23 @@ const RULES = [
     confidence_weight: 95,
     is_active: false,
   },
+  {
+    id: 'R005',
+    name: 'Network Reconnaissance (Port Scan)',
+    tactic: 'TA0043',
+    technique: 'T1046',
+    definition: {
+      time_window_seconds: 120,
+      interval_seconds: 60,
+      threshold: 15,
+      max_time_span_seconds: 60,
+      source_types: ['firewall', 'web_proxy', 'syslog'],
+      actions: ['network_connect'],
+      outcomes: ['success', 'failure'],
+    },
+    confidence_weight: 70,
+    is_active: false,
+  },
 ];
 
 async function main() {
@@ -127,7 +144,9 @@ async function main() {
   }
 
   await prisma.$disconnect();
-  console.log('\nDone. All 4 rules seeded (set to inactive — activate via API).');
+  console.log(
+    '\nDone. All 5 rules seeded (set to inactive — activate via API).',
+  );
 }
 
 main().catch((e) => {

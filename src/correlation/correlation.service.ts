@@ -6,6 +6,7 @@ import { BruteForceRule } from './rules/r001-brute-force.rule';
 import { PassTheHashRule } from './rules/r002-pass-the-hash.rule';
 import { DataExfilRule } from './rules/r003-data-exfiltration.rule';
 import { LogClearingRule } from './rules/r004-log-clearing.rule';
+import { ReconnaissanceRule } from './rules/r005-reconnaissance.rule';
 import type {
   DetectionRule,
   DetectionResult,
@@ -40,6 +41,7 @@ export class CorrelationService {
     new PassTheHashRule(),
     new DataExfilRule(),
     new LogClearingRule(),
+    new ReconnaissanceRule(),
   ];
 
   /** Track when each rule last ran to avoid re-scanning old events */
