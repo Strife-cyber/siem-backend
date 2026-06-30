@@ -16,6 +16,7 @@ import {
 import { AuthService } from './auth.service';
 import { SignInDto } from './dto/sign-in.dto';
 import { SignUpDto } from './dto/sign-up.dto';
+import { VerifyMfaDto, EnableMfaDto } from './dto/mfa.dto';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 
@@ -28,9 +29,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   @ApiOperation({ summary: 'Authenticate user and get JWT' })
-  @ApiOkResponse({ description: 'Success - returns JWT access token' })
+  @ApiOkResponse({ description: 'Returns JWT or mfa_required' })
   async signIn(@Body() dto: SignInDto) {
     return this.authService.signIn(dto.username, dto.password);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('mfa/verify')
+  @ApiOperation({ summary: 'Verify MFA code and complete login' })
+  @ApiOkResponse({ description: 'Returns JWT after MFA verification' })
+  async verifyMfa(@Body() dto: VerifyMfaDto) {
+    return this.authService.verifyMfa(dto.session_id, dto.code);
   }
 
   @Public()
@@ -39,7 +49,33 @@ export class AuthController {
   @ApiOperation({ summary: 'Register a new user' })
   @ApiCreatedResponse({ description: 'User registered successfully' })
   async signUp(@Body() dto: SignUpDto) {
-    return this.authService.signUp(dto.username, dto.password, dto.role);
+    return this.authService.signUp(
+      dto.username,
+      dto.password,
+      dto.role,
+      dto.email,
+    );
+  }
+
+  @ApiBearerAuth('BearerAuth')
+  @Post('mfa/enable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Enable MFA with email for OTP delivery' })
+  @ApiOkResponse({ description: 'MFA enabled' })
+  async enableMfa(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: EnableMfaDto,
+  ) {
+    return this.authService.enableMfa(userId, dto.email);
+  }
+
+  @ApiBearerAuth('BearerAuth')
+  @Post('mfa/disable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Disable MFA for current user' })
+  @ApiOkResponse({ description: 'MFA disabled' })
+  async disableMfa(@CurrentUser('sub') userId: string) {
+    return this.authService.disableMfa(userId);
   }
 
   @ApiBearerAuth('BearerAuth')

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; background: #f4f4f4; padding: 32px;">
+<div style="max-width: 600px; margin: auto; background: white; border-radius: 8px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+  <h2 style="color: #1e293b; margin-top: 0;">Daily SOC Report</h2>
+  <p style="color: #64748b;">{{date}}</p>
+
+  <div style="background: #f1f5f9; border-radius: 8px; padding: 16px; text-align: center; margin: 24px 0;">
+    <span style="font-size: 48px; font-weight: bold; color: #1d4ed8;">{{total}}</span>
+    <p style="color: #64748b; margin: 4px 0 0;">total incidents</p>
+  </div>
+
+  <h3 style="color: #334155;">By Severity</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    {{#each counts}}
+    <tr>
+      <td style="padding: 8px; color: #64748b;">{{@key}}</td>
+      <td style="padding: 8px; font-weight: bold; text-align: right;">{{this}}</td>
+    </tr>
+    {{/each}}
+  </table>
+
+  <h3 style="color: #334155; margin-top: 24px;">Top Rules Triggered</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    {{#each topRules}}
+    <tr style="background: #f8fafc;">
+      <td style="padding: 8px; color: #475569;">{{name}}</td>
+      <td style="padding: 8px; font-weight: bold; text-align: right;">{{count}} times</td>
+    </tr>
+    {{/each}}
+  </table>
+
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;">
+  <p style="color: #94a3b8; font-size: 12px;">Smart SIEM CTU — Automated Daily Digest</p>
+</div>
+</body>
+</html>

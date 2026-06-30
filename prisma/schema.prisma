@@ -54,7 +54,8 @@ model User {
   id            String    @id @default(uuid()) @db.Uuid
   username      String    @unique @db.VarChar(100)
   password_hash String    @db.VarChar(255)
-  mfa_secret    String?   @db.VarChar(255)
+  email         String?   @db.VarChar(255)
+  mfa_enabled   Boolean   @default(false)
   role          UserRole  @default(READER)
   created_at    DateTime  @default(now()) @db.Timestamptz()
   updated_at    DateTime  @updatedAt @db.Timestamptz()
@@ -64,8 +65,23 @@ model User {
   assigned_incidents  Incident[]          @relation("assigned_incidents")
   triggered_playbooks PlaybookExecution[] @relation("triggered_playbooks")
   audit_trails        AuditTrail[]
+  mfa_sessions        MfaSession[]
 
   @@map("users")
+}
+
+model MfaSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String   @db.Uuid
+  code       String   @db.VarChar(6)
+  expires_at DateTime @db.Timestamptz()
+  used       Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamptz()
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, code])
+  @@map("mfa_sessions")
 }
 
 model CorrelationRule {

@@ -19,6 +19,8 @@ import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { ReportsModule } from './reports/reports.module';
 import { CorrelationModule } from './correlation/correlation.module';
+import { MailModule } from './mail/mail.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { CorrelationModule } from './correlation/correlation.module';
     AuditModule,
     ReportsModule,
     CorrelationModule,
+    MailModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

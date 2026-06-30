@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Queue } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
 import { ElasticsearchService } from '../elasticsearch/elasticsearch.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SoarService } from '../soar/soar.service';
@@ -51,6 +53,7 @@ export class CorrelationService {
     private readonly es: ElasticsearchService,
     private readonly prisma: PrismaService,
     private readonly soar: SoarService,
+    @InjectQueue('notifications') private readonly notificationsQueue: Queue,
   ) {}
 
   async runCycle(): Promise<CycleReport> {
@@ -261,6 +264,11 @@ export class CorrelationService {
       this.logger.warn(
         `  [NEW] Incident ${incident.id}: ${result.severity} - ${result.summary}`,
       );
+
+      // Queue email notification (non-blocking)
+      this.notificationsQueue
+        .add('incident-alert', { incidentId: incident.id })
+        .catch(() => {});
 
       const rule = this.builtinRules.find((r) => r.id === result.rule_id);
       if (rule?.definition.trigger_playbook) {

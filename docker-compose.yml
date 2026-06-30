@@ -21,8 +21,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: siem-redis
-    ports:
-      - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -43,7 +41,6 @@ services:
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
       - '9200:9200'
-      - '9300:9300'
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -70,7 +67,18 @@ services:
       REDIS_PORT: 6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
       JWT_SECRET: change-this-to-a-secure-random-string-in-production
-      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,https://api.siem.strife-cyber.org
+      PFSENSE_URL: https://192.168.1.1
+      PFSENSE_API_KEY: ''
+      PFSENSE_TIMEOUT: '10000'
+      PFSENSE_REJECT_UNAUTHORIZED: 'false'
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: '587'
+      SMTP_USER: dunamisjunior15@gmail.com
+      SMTP_PASS: fkjt myap dzjk hnhi
+      SMTP_FROM_NAME: 'Smart SIEM CTU'
+      ALERT_EMAIL_TO: dunamisjunior15@gmail.com
+      SIEM_DASHBOARD_URL: https://api.siem.strife-cyber.org
     depends_on:
       postgres:
         condition: service_healthy

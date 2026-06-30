@@ -10,6 +10,9 @@ import { SoarModule } from '../soar/soar.module';
     BullModule.registerQueue({
       name: 'correlation',
     }),
+    BullModule.registerQueue({
+      name: 'notifications',
+    }),
     SoarModule,
   ],
   providers: [CorrelationService, CorrelationScheduler],

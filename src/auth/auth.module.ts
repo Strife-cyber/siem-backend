@@ -5,6 +5,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { MfaService } from './mfa.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
@@ -14,9 +16,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
         process.env.JWT_SECRET || 'siem-jwt-secret-key-change-in-production',
       signOptions: { expiresIn: '24h' },
     }),
+    MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy],
+  providers: [AuthService, MfaService, LocalStrategy, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

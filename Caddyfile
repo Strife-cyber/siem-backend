@@ -1,0 +1,13 @@
+# Smart SIEM CTU — Caddy Reverse Proxy
+# Uses internal self-signed certs for Tailscale/private network.
+# Replace with real domain + remove 'tls internal' for public Let's Encrypt TLS.
+
+api.siem.strife-cyber.org {
+    tls internal
+    reverse_proxy app:3000
+}
+
+# Local development fallback
+:80 {
+    reverse_proxy app:3000
+}
