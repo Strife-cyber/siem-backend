@@ -27,6 +27,7 @@ COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/generated ./generated
 COPY --from=builder /usr/src/app/prisma ./prisma
 COPY templates ./templates
+RUN mkdir -p /usr/src/app/reports/pdf /usr/src/app/reports/xlsx /usr/src/app/reports/csv
 
 # Create config and verify it exists
 RUN echo 'import { defineConfig } from "prisma/config";' > /usr/src/app/prisma.config.ts && \

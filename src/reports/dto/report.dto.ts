@@ -16,9 +16,9 @@ export class ReportGenerationDto {
   @IsDateString()
   end_date!: string;
 
-  @ApiProperty({ enum: ['pdf', 'excel'] })
-  @IsEnum(['pdf', 'excel'] as const)
-  format!: 'pdf' | 'excel';
+  @ApiProperty({ enum: ['pdf', 'excel', 'csv'] })
+  @IsEnum(['pdf', 'excel', 'csv'] as const)
+  format!: 'pdf' | 'excel' | 'csv';
 
   @ApiPropertyOptional()
   @IsOptional()

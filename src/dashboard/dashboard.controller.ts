@@ -4,9 +4,10 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiOkResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
-import { DashboardTimelineQuery } from './dto/dashboard-stats.dto';
+import { DashboardOverviewQuery } from './dto/dashboard-stats.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth('BearerAuth')
@@ -21,10 +22,16 @@ export class DashboardController {
     return this.dashboardService.getStats();
   }
 
-  @Get('timeline')
-  @ApiOperation({ summary: 'Get timeline for graphs' })
-  @ApiOkResponse({ description: 'Array of timeline points' })
-  getTimeline(@Query() _query: DashboardTimelineQuery) {
-    return [];
+  @Get('overview')
+  @ApiOperation({ summary: 'Get all dashboard graphs in one call' })
+  @ApiQuery({
+    name: 'interval',
+    required: false,
+    enum: ['16h', '24h', '7d', '30d'],
+  })
+  @ApiQuery({ name: 'source_type', required: false })
+  @ApiOkResponse({ description: 'Complete dashboard overview payload' })
+  async getOverview(@Query() query: DashboardOverviewQuery) {
+    return this.dashboardService.getOverview(query.interval, query.source_type);
   }
 }

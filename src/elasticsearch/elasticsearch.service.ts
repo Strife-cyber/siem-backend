@@ -261,6 +261,7 @@ export class ElasticsearchService implements OnModuleInit {
 
     const response = await this.client.search({
       index: LOGS_ALIAS,
+      track_total_hits: true,
       from: query.from ?? 0,
       size: query.size ?? 50,
       sort: [
