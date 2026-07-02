@@ -81,23 +81,38 @@ export class ElasticsearchService implements OnModuleInit {
                   stopwords: '_english_',
                 },
               },
+              normalizer: {
+                case_insensitive: {
+                  type: 'custom',
+                  filter: ['lowercase'],
+                },
+              },
             },
           },
           mappings: {
             properties: {
               collected_at: { type: 'date' },
               normalized_at: { type: 'date' },
-              source_type: { type: 'keyword' },
-              hostname: { type: 'keyword' },
+              source_type: { type: 'keyword', normalizer: 'case_insensitive' },
+              hostname: { type: 'keyword', normalizer: 'case_insensitive' },
               source_ip: { type: 'ip' },
               destination_ip: { type: 'ip' },
               source_port: { type: 'integer' },
               destination_port: { type: 'integer' },
-              user_principal: { type: 'keyword' },
-              user_security_id: { type: 'keyword' },
-              event_taxonomy: { type: 'keyword' },
-              action: { type: 'keyword' },
-              outcome: { type: 'keyword' },
+              user_principal: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              user_security_id: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              event_taxonomy: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              action: { type: 'keyword', normalizer: 'case_insensitive' },
+              outcome: { type: 'keyword', normalizer: 'case_insensitive' },
               severity: { type: 'byte' },
               raw_message: {
                 type: 'text',
@@ -106,22 +121,25 @@ export class ElasticsearchService implements OnModuleInit {
                   keyword: { type: 'keyword', ignore_above: 256 },
                 },
               },
-              tags: { type: 'keyword' },
+              tags: { type: 'keyword', normalizer: 'case_insensitive' },
               ingestion_hash: { type: 'keyword' },
               confidence_score: { type: 'byte' },
               // ---- Enrichment fields (parsed from raw_message) ----
               event_id: { type: 'integer' },
               logon_type: { type: 'byte' },
-              target_user: { type: 'keyword' },
-              failure_reason: { type: 'keyword' },
+              target_user: { type: 'keyword', normalizer: 'case_insensitive' },
+              failure_reason: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
               source_network_address: { type: 'ip' },
-              workstation: { type: 'keyword' },
-              auth_package: { type: 'keyword' },
-              service_name: { type: 'keyword' },
+              workstation: { type: 'keyword', normalizer: 'case_insensitive' },
+              auth_package: { type: 'keyword', normalizer: 'case_insensitive' },
+              service_name: { type: 'keyword', normalizer: 'case_insensitive' },
               bytes_sent: { type: 'long' },
               bytes_recv: { type: 'long' },
-              direction: { type: 'keyword' },
-              protocol: { type: 'keyword' },
+              direction: { type: 'keyword', normalizer: 'case_insensitive' },
+              protocol: { type: 'keyword', normalizer: 'case_insensitive' },
               duration_seconds: { type: 'integer' },
             },
             _meta: {
@@ -289,6 +307,55 @@ export class ElasticsearchService implements OnModuleInit {
         score: hit._score,
         source: hit._source as NormalizedLog,
       })),
+    };
+  }
+
+  async getUniqueValues(
+    field: string,
+    q?: string,
+    size: number = 100,
+  ): Promise<{ values: string[]; total: number }> {
+    const must: Record<string, unknown>[] = [];
+
+    if (q) {
+      must.push({
+        multi_match: {
+          query: q,
+          fields: ['raw_message', 'hostname', 'source_ip', 'user_principal'],
+        },
+      });
+    }
+
+    const response = await this.client.search({
+      index: LOGS_ALIAS,
+      size: 0,
+      track_total_hits: true,
+      query: {
+        bool: {
+          must: must.length > 0 ? must : [{ match_all: {} }],
+        },
+      },
+      aggs: {
+        unique_values: {
+          terms: {
+            field,
+            size,
+            order: { _count: 'desc' },
+          },
+        },
+      },
+    });
+
+    const buckets =
+      (response as any).aggregations?.unique_values?.buckets ?? [];
+    const total =
+      typeof response.hits.total === 'number'
+        ? response.hits.total
+        : (response.hits.total?.value ?? 0);
+
+    return {
+      values: buckets.map((b: any) => b.key as string),
+      total,
     };
   }
 

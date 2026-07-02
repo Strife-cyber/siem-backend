@@ -3,6 +3,7 @@ import type { NormalizedLog } from '../interfaces/normalized-log.interface';
 import { parseWindowsSecurity } from './windows-security.enricher';
 import { parseLinuxAuth } from './linux-auth.enricher';
 import { parseFirewall } from './firewall.enricher';
+import { parseLinuxGeneric } from './linux-generic.enricher';
 
 /**
  * Enricher function signature.
@@ -20,9 +21,18 @@ export type EnricherFn = (
 const enricherRegistry: Record<string, EnricherFn> = {
   windows_security: parseWindowsSecurity,
   linux_auth: parseLinuxAuth,
+  linux: parseLinuxGeneric,
   firewall: parseFirewall,
   web_proxy: parseFirewall,
   syslog: parseLinuxAuth,
+  linux_syslog: parseLinuxAuth,
+  linux_network: parseLinuxGeneric,
+  linux_process: parseLinuxGeneric,
+  linux_kernel: parseLinuxGeneric,
+  linux_systemd_journal: parseLinuxGeneric,
+  app: parseLinuxGeneric,
+  active_directory: parseWindowsSecurity,
+  traefik: parseFirewall,
 };
 
 /**

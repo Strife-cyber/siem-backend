@@ -22,7 +22,13 @@ export class DataExfilRule implements DetectionRule {
     time_window_seconds: 900,
     interval_seconds: 120,
     threshold: 1,
-    source_types: ['firewall', 'web_proxy'],
+    source_types: [
+      'firewall',
+      'web_proxy',
+      'traefik',
+      'linux_network',
+      'linux',
+    ],
     params: {
       multiplier_threshold: 10,
       min_volume_mb: 10,

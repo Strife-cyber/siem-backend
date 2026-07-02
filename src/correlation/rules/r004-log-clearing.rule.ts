@@ -21,7 +21,15 @@ export class LogClearingRule implements DetectionRule {
     time_window_seconds: 300,
     interval_seconds: 120,
     threshold: 1,
-    source_types: ['windows_security', 'linux_auth', 'syslog'],
+    source_types: [
+      'windows_security',
+      'linux_auth',
+      'linux',
+      'linux_syslog',
+      'linux_systemd_journal',
+      'syslog',
+      'windows',
+    ],
     params: {
       volume_drop_threshold_pct: 10,
       volume_baseline_hours: 24,

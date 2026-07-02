@@ -19,8 +19,21 @@ export class BruteForceRule implements DetectionRule {
     interval_seconds: 60,
     threshold: 5,
     max_time_span_seconds: 45,
-    source_types: ['linux_auth', 'windows_security'],
-    actions: ['login'],
+    source_types: [
+      'linux',
+      'linux_auth',
+      'linux_syslog',
+      'windows',
+      'windows_security',
+      'active_directory',
+    ],
+    actions: [
+      'login',
+      'user_login',
+      'failed_login',
+      'auth_failure',
+      'auth_event',
+    ],
     outcomes: ['failure'],
   };
 

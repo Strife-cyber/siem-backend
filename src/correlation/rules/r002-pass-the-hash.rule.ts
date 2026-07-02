@@ -21,8 +21,8 @@ export class PassTheHashRule implements DetectionRule {
     time_window_seconds: 300,
     interval_seconds: 120,
     threshold: 1,
-    source_types: ['windows_security'],
-    actions: ['login', 'authenticate'],
+    source_types: ['windows', 'windows_security', 'active_directory'],
+    actions: ['login', 'authenticate', 'user_login', 'successful_login'],
     outcomes: ['success'],
     params: {
       baseline_redis_key: 'pth:baseline',

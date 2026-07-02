@@ -10,6 +10,7 @@ import {
 import { LogsService } from './logs.service';
 import { CreateLogDto } from './dto/create-log.dto';
 import { SearchLogsDto } from './dto/search-logs.dto';
+import { UniqueValuesDto } from './dto/unique-values.dto';
 import { ApiKeyGuard } from '../auth/guards/api-key.guard';
 import { Public } from '../auth/decorators/public.decorator';
 
@@ -25,6 +26,9 @@ export class LogsController {
   @ApiOperation({ summary: 'Ingest raw logs from collector agents (FR-01.1)' })
   @ApiCreatedResponse({ description: 'Logs accepted for processing' })
   async ingest(@Body() logs: CreateLogDto[]) {
+    if (!Array.isArray(logs)) {
+      return { accepted: 0, error: 'Body must be an array of log objects' };
+    }
     return this.logsService.ingest(logs);
   }
 
@@ -34,5 +38,15 @@ export class LogsController {
   @ApiOkResponse({ description: 'Paginated log results' })
   async search(@Query() query: SearchLogsDto) {
     return this.logsService.search(query);
+  }
+
+  @ApiBearerAuth('BearerAuth')
+  @Get('unique-values')
+  @ApiOperation({
+    summary: 'Get unique values for a log field (e.g. hostname, source_type)',
+  })
+  @ApiOkResponse({ description: 'Unique values with total matching count' })
+  async uniqueValues(@Query() query: UniqueValuesDto) {
+    return this.logsService.getUniqueValues(query.field, query.q, query.size);
   }
 }

@@ -52,6 +52,19 @@ services:
     networks:
       - siem-network
 
+  kibana:
+    image: kibana:9.4.3
+    container_name: siem-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - '5601:5601'
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    networks:
+      - siem-network
+
   app:
     build:
       context: .

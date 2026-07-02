@@ -20,8 +20,15 @@ export class ReconnaissanceRule implements DetectionRule {
     interval_seconds: 60,
     threshold: 15,
     max_time_span_seconds: 60,
-    source_types: ['firewall', 'web_proxy', 'syslog'],
-    actions: ['network_connect'],
+    source_types: [
+      'firewall',
+      'web_proxy',
+      'traefik',
+      'linux_network',
+      'syslog',
+      'linux',
+    ],
+    actions: ['network_connect', 'network_flow', 'http_request'],
     outcomes: ['success', 'failure'],
   };
 

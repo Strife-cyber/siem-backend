@@ -38,12 +38,14 @@ export class SearchLogsDto {
   action?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(7)
   severity_min?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(7)

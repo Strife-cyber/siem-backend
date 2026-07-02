@@ -22,6 +22,10 @@ export class LogsService {
     };
   }
 
+  async getUniqueValues(field: string, q?: string, size: number = 100) {
+    return this.elasticsearchService.getUniqueValues(field, q, size);
+  }
+
   async search(query: SearchLogsDto) {
     const esQuery: LogSearchQuery = {
       source_ip: query.source_ip,

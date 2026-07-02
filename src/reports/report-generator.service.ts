@@ -65,8 +65,17 @@ export class ReportGeneratorService {
     const id = crypto.randomUUID();
     const filename = `${request.start_date.slice(0, 10)}-report-${id.slice(0, 8)}.pdf`;
     const filePath = path.join(this.reportsDir, 'pdf', filename);
-    const doc = new PDF({ size: 'A4', margin: 50 });
 
+    // Verify data is not empty
+    const hasContent =
+      data?.overview || data?.incidents?.length > 0 || data?.logs?.length > 0;
+    if (!hasContent) {
+      this.logger.warn(
+        '[PDF] No data to generate report — creating summary-only PDF',
+      );
+    }
+
+    const doc = new PDF({ size: 'A4', margin: 50 });
     const writeStream = fs.createWriteStream(filePath);
     doc.pipe(writeStream);
 
@@ -366,9 +375,22 @@ export class ReportGeneratorService {
 
     // Finalize PDF
     doc.end();
-    await new Promise<void>((resolve) => writeStream.on('finish', resolve));
+    await new Promise<void>((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`PDF file was not created at ${filePath}`);
+    }
 
     const stat = fs.statSync(filePath);
+    if (stat.size < 100) {
+      this.logger.warn(
+        `[PDF] Generated file is very small (${stat.size} bytes) — possible empty PDF`,
+      );
+    }
+
     const meta: ReportMeta = {
       id,
       filename,
