@@ -122,27 +122,26 @@ export class SoarController {
     );
   }
 
-  @Post('aliases/:name/delete')
+  @Post('aliases/:id/delete')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Delete an IP alias from pfSense' })
-  async deleteAlias(@Param('name') name: string) {
-    return deleteAliasPlaybook(this.pfsense, name, this.logger);
+  @ApiOperation({ summary: 'Delete an IP alias from pfSense by its ID' })
+  async deleteAlias(@Param('id') id: string) {
+    return deleteAliasPlaybook(this.pfsense, id, this.logger);
   }
 
-  @Get('health')
-  @ApiOperation({ summary: 'Check pfSense API connectivity' })
-  async healthCheck() {
-    if (!this.pfsense.isConfigured) {
-      return {
-        status: 'not_configured',
-        message: 'Set PFSENSE_API_KEY env var',
-      };
-    }
-    const result = await this.pfsense.getSystemInfo();
-    return {
-      status: result.status === 'ok' ? 'connected' : 'error',
-      ...(result.data ?? {}),
-      message: result.message,
-    };
+  @Get('aliases')
+  @ApiOperation({ summary: 'List all aliases from pfSense' })
+  async listAliases() {
+    const result = await this.pfsense.listAliases();
+    return result.data ?? [];
+  }
+
+  @Get('status')
+  @ApiOperation({ summary: 'Get pfSense connection status and stats' })
+  @ApiOkResponse({
+    description: 'pfSense status with version, rules count, aliases count',
+  })
+  async getStatus() {
+    return this.pfsense.getStatus();
   }
 }

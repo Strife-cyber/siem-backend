@@ -3,9 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 export interface PfSenseRule {
   id: string;
   type: 'block' | 'pass';
-  interface: string;
+  interface: string[];
   ipprotocol: 'inet' | 'inet6';
-  protocol: string;
   source: string;
   destination: string;
   destination_port?: string;
@@ -15,6 +14,7 @@ export interface PfSenseRule {
 }
 
 export interface PfSenseAlias {
+  id: string;
   name: string;
   type: 'host' | 'network' | 'port';
   addresses: string[];
@@ -27,30 +27,34 @@ export interface PfSenseResponse<T = unknown> {
   message?: string;
 }
 
-/**
- * Client for pfSense REST API (v2).
- * Handles auth, self-signed certs, rate limiting, and error translation.
- */
+export interface PfSenseStatus {
+  configured: boolean;
+  baseUrl: string;
+  reachable: boolean;
+  version?: string;
+  hostname?: string;
+  uptime?: string;
+  rulesCount?: number;
+  aliasesCount?: number;
+  lastError?: string;
+}
+
 @Injectable()
 export class PfSenseClientService {
   private readonly logger = new Logger(PfSenseClientService.name);
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeout: number;
-  private readonly rejectUnauthorized: boolean;
 
-  /** Simple mutex to rate-limit writes (pfSense XML config is slow) */
   private writeLock = false;
   private writeQueue: Array<() => Promise<void>> = [];
   private applyDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.baseUrl =
-      process.env.PFSENSE_URL?.replace(/\/+$/, '') ?? 'https://192.168.1.1';
+      process.env.PFSENSE_URL?.replace(/\/+$/, '') ?? 'http://192.168.37.135';
     this.apiKey = process.env.PFSENSE_API_KEY ?? '';
     this.timeout = Number(process.env.PFSENSE_TIMEOUT ?? '10000');
-    this.rejectUnauthorized =
-      process.env.PFSENSE_REJECT_UNAUTHORIZED !== 'false';
   }
 
   get isConfigured(): boolean {
@@ -58,13 +62,40 @@ export class PfSenseClientService {
   }
 
   // ──────────────────────────────────────────────
-  //  System / Health
+  //  Status / Health
   // ──────────────────────────────────────────────
 
-  async getSystemInfo(): Promise<
-    PfSenseResponse<{ version: string; hostname: string; uptime: string }>
-  > {
-    return this.get('/api/v2/system/info');
+  async getStatus(): Promise<PfSenseStatus> {
+    const result: PfSenseStatus = {
+      configured: this.isConfigured,
+      baseUrl: this.baseUrl,
+      reachable: false,
+    };
+
+    if (!this.isConfigured) return result;
+
+    try {
+      const info = await this.get('/api/v2/system/info');
+      if (info.status === 'ok') {
+        const d = info.data as any;
+        result.reachable = true;
+        result.version = d?.version ?? d?.data?.version;
+        result.hostname = d?.hostname ?? d?.data?.hostname;
+        result.uptime = d?.uptime ?? d?.data?.uptime;
+      }
+      const rules = await this.listRules();
+      if (rules.status === 'ok') {
+        result.rulesCount = (rules.data ?? []).length;
+      }
+      const aliases = await this.get('/api/v2/firewall/aliases');
+      if (aliases.status === 'ok') {
+        result.aliasesCount = ((aliases.data as any[]) ?? []).length;
+      }
+    } catch (err: any) {
+      result.lastError = err.message;
+    }
+
+    return result;
   }
 
   // ──────────────────────────────────────────────
@@ -74,14 +105,12 @@ export class PfSenseClientService {
   async blockIP(
     ip: string,
     reason: string,
-    interface_: string = 'wan',
   ): Promise<PfSenseResponse<{ id: string }>> {
     return this.write(async () => {
-      const result = await this.post('/api/v2/firewall/rules', {
+      const result = await this.post('/api/v2/firewall/rule', {
         type: 'block',
-        interface: interface_,
+        interface: ['wan'],
         ipprotocol: 'inet',
-        protocol: 'any',
         source: ip,
         destination: 'any',
         descr: `BLOCKED by Smart SIEM - ${reason}`,
@@ -97,7 +126,9 @@ export class PfSenseClientService {
 
   async unblockIP(ruleId: string): Promise<PfSenseResponse> {
     return this.write(async () => {
-      const result = await this.del(`/api/v2/firewall/rules/${ruleId}`);
+      const result = await this.del(
+        `/api/v2/firewall/rule?id=${encodeURIComponent(ruleId)}`,
+      );
       if (result.status === 'ok') {
         await this.applyChanges();
       }
@@ -108,14 +139,12 @@ export class PfSenseClientService {
   async isolateHost(
     ip: string,
     reason: string,
-  ): Promise<PfSenseResponse<{ inboundId: string; outboundId: string }>> {
+  ): Promise<PfSenseResponse<{ outboundId: string; inboundId: string }>> {
     return this.write(async () => {
-      // Block traffic FROM the host
-      const outbound = await this.post('/api/v2/firewall/rules', {
+      const outbound = await this.post('/api/v2/firewall/rule', {
         type: 'block',
-        interface: 'lan',
+        interface: ['lan'],
         ipprotocol: 'inet',
-        protocol: 'any',
         source: ip,
         destination: 'any',
         descr: `ISOLATED by Smart SIEM - ${reason} (outbound)`,
@@ -123,12 +152,10 @@ export class PfSenseClientService {
         log: true,
       });
 
-      // Block traffic TO the host
-      const inbound = await this.post('/api/v2/firewall/rules', {
+      const inbound = await this.post('/api/v2/firewall/rule', {
         type: 'block',
-        interface: 'lan',
+        interface: ['lan'],
         ipprotocol: 'inet',
-        protocol: 'any',
         source: 'any',
         destination: ip,
         descr: `ISOLATED by Smart SIEM - ${reason} (inbound)`,
@@ -154,9 +181,9 @@ export class PfSenseClientService {
     reason: string,
   ): Promise<PfSenseResponse<{ id: string }>> {
     return this.write(async () => {
-      const result = await this.post('/api/v2/firewall/rules', {
+      const result = await this.post('/api/v2/firewall/rule', {
         type: 'block',
-        interface: 'wan',
+        interface: ['wan'],
         ipprotocol: 'inet',
         protocol,
         source: ip,
@@ -179,16 +206,18 @@ export class PfSenseClientService {
 
   async checkIP(
     ip: string,
-  ): Promise<PfSenseResponse<{ blocked: boolean; rules: PfSenseRule[] }>> {
-    const result = await this.listRules();
-    const rules = result.data ?? [];
-    const matching = rules.filter(
-      (r) => r.type === 'block' && (r.source === ip || r.destination === ip),
-    );
-    return {
-      status: 'ok',
-      data: { blocked: matching.length > 0, rules: matching },
-    };
+  ): Promise<{ blocked: boolean; rules: PfSenseRule[] }> {
+    try {
+      const result = await this.listRules();
+      const rules = (result.data ?? []) as any[];
+      const matching = rules.filter(
+        (r: any) =>
+          r.type === 'block' && (r.source === ip || r.destination === ip),
+      );
+      return { blocked: matching.length > 0, rules: matching as PfSenseRule[] };
+    } catch {
+      return { blocked: false, rules: [] };
+    }
   }
 
   // ──────────────────────────────────────────────
@@ -201,37 +230,46 @@ export class PfSenseClientService {
     descr: string,
   ): Promise<PfSenseResponse> {
     return this.write(async () => {
-      const result = await this.post('/api/v2/aliases', {
+      return this.post('/api/v2/firewall/alias', {
         name,
         type: 'host',
         addresses,
         descr: `Smart SIEM - ${descr}`,
       });
-      return result;
     });
   }
 
-  async deleteAlias(name: string): Promise<PfSenseResponse> {
+  async deleteAlias(id: string): Promise<PfSenseResponse> {
     return this.write(async () => {
-      const result = await this.del(`/api/v2/aliases/${name}`);
-      return result;
+      return this.del(`/api/v2/firewall/alias?id=${encodeURIComponent(id)}`);
     });
   }
+
+  async listAliases(): Promise<PfSenseResponse<PfSenseAlias[]>> {
+    return this.get('/api/v2/firewall/aliases');
+  }
+
+  // ──────────────────────────────────────────────
+  //  Apply Changes
+  // ──────────────────────────────────────────────
 
   private async applyChanges(): Promise<void> {
-    // Debounce: coalesce multiple writes into one apply call
     if (this.applyDebounceTimer) return;
     return new Promise<void>((resolve) => {
       this.applyDebounceTimer = setTimeout(() => {
         this.applyDebounceTimer = null;
         this.post('/api/v2/firewall/apply', {})
-          .catch((err: any) => {
-            this.logger.error(`[pfSense] applyChanges failed: ${err.message}`);
-          })
+          .catch((err: any) =>
+            this.logger.error(`[pfSense] applyChanges failed: ${err.message}`),
+          )
           .finally(() => resolve());
       }, 500);
     });
   }
+
+  // ──────────────────────────────────────────────
+  //  HTTP Methods
+  // ──────────────────────────────────────────────
 
   private async get<T>(path: string): Promise<PfSenseResponse<T>> {
     return this.request('GET', path);
@@ -254,18 +292,13 @@ export class PfSenseClientService {
     body?: unknown,
   ): Promise<PfSenseResponse<T>> {
     if (!this.apiKey) {
-      this.logger.warn('[pfSense] No API key configured — skipping request');
+      this.logger.warn('[pfSense] No API key configured');
       return { status: 'error', message: 'PFSENSE_API_KEY not configured' };
     }
 
     const url = `${this.baseUrl}${path}`;
-    const headers: Record<string, string> = {
-      'X-API-Key': this.apiKey,
-    };
-
-    if (body) {
-      headers['Content-Type'] = 'application/json';
-    }
+    const headers: Record<string, string> = { 'X-API-Key': this.apiKey };
+    if (body) headers['Content-Type'] = 'application/json';
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -287,61 +320,51 @@ export class PfSenseClientService {
       }
 
       if (!response.ok) {
-        const errorMap: Record<number, string> = {
+        const map: Record<number, string> = {
           401: 'Invalid pfSense API key',
-          403: 'Insufficient pfSense API permissions',
-          404: 'pfSense endpoint not found',
+          403: 'Insufficient permissions',
+          404: 'Endpoint not found',
           500: 'pfSense internal error',
         };
         throw new Error(
-          errorMap[response.status] ??
-            `pfSense HTTP ${response.status}: ${text.slice(0, 200)}`,
+          map[response.status] ??
+            `HTTP ${response.status}: ${text.slice(0, 200)}`,
         );
       }
 
       return { status: 'ok', data: data as T };
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        this.logger.error(`[pfSense] Request timed out: ${method} ${path}`);
+        this.logger.error(`[pfSense] Timeout: ${method} ${path}`);
         return {
           status: 'error',
           message: `Request timed out after ${this.timeout}ms`,
         };
       }
-      this.logger.error(
-        `[pfSense] Request failed: ${method} ${path} — ${err.message}`,
-      );
+      this.logger.error(`[pfSense] ${method} ${path}: ${err.message}`);
       return { status: 'error', message: err.message };
     } finally {
       clearTimeout(timeoutId);
     }
   }
 
-  // ──────────────────────────────────────────────
-  //  Write Mutex (rate limit: max 5 concurrent writes)
-  // ──────────────────────────────────────────────
-
   private async write<T>(fn: () => Promise<T>): Promise<T> {
     if (this.writeLock) {
-      // Queue and wait
       return new Promise((resolve, reject) => {
         this.writeQueue.push(async () => {
           try {
-            const result = await fn();
-            resolve(result);
+            resolve(await fn());
           } catch (err) {
             reject(err instanceof Error ? err : new Error(String(err)));
           }
         });
       });
     }
-
     this.writeLock = true;
     try {
       return await fn();
     } finally {
       this.writeLock = false;
-      // Process next in queue
       const next = this.writeQueue.shift();
       if (next) {
         this.writeLock = true;

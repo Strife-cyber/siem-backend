@@ -68,8 +68,8 @@ services:
       ELASTICSEARCH_URL: http://elasticsearch:9200
       JWT_SECRET: change-this-to-a-secure-random-string-in-production
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,https://api.siem.strife-cyber.org
-      PFSENSE_URL: https://192.168.1.1
-      PFSENSE_API_KEY: ''
+      PFSENSE_URL: http://192.168.37.135
+      PFSENSE_API_KEY: 0ee670fbb746a2de16bae58c3775d088
       PFSENSE_TIMEOUT: '10000'
       PFSENSE_REJECT_UNAUTHORIZED: 'false'
       SMTP_HOST: smtp.gmail.com
