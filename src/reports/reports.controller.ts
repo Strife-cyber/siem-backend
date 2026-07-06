@@ -64,7 +64,9 @@ export class ReportsController {
           : 'application/octet-stream';
 
     const stream = fs.createReadStream(result.filePath);
+    const stat = fs.statSync(result.filePath);
     res.setHeader('Content-Type', ext);
+    res.setHeader('Content-Length', stat.size);
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="${result.filename}"`,

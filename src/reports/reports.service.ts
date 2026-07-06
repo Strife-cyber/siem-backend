@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'node:crypto';
 import { ElasticsearchService } from '../elasticsearch/elasticsearch.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -47,10 +47,22 @@ export class ReportsService {
       const dateFrom = new Date(request.start_date);
       const dateTo = new Date(request.end_date);
 
+      // Compute dashboard interval from the date range
+      const rangeHours =
+        (dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60);
+      const overviewInterval =
+        rangeHours <= 2
+          ? '1h'
+          : rangeHours <= 48
+            ? '24h'
+            : rangeHours <= 336
+              ? '7d'
+              : '30d';
+
       // Gather all data in parallel
       const [overview, logs, incidents, auditTrails, uebaProfiles] =
         await Promise.all([
-          this.dashboard.getOverview('24h').catch(() => ({})),
+          this.dashboard.getOverview(overviewInterval).catch(() => ({})),
           this.fetchLogs(dateFrom, dateTo),
           this.prisma.incident.findMany({
             where: { triggered_at: { gte: dateFrom, lte: dateTo } },
@@ -125,7 +137,7 @@ export class ReportsService {
         const result = await this.es
           .getClient()
           .search(body)
-          .then((r: any) => r as any);
+          .then((r: any) => r);
         const hits = result?.hits?.hits ?? [];
         if (hits.length === 0) break;
 
