@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class IncidentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(IncidentsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   findAll(filters: {
     status?: string;
@@ -28,7 +34,7 @@ export class IncidentsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actingUserId?: string) {
     const incident = await this.prisma.incident.findUnique({
       where: { id },
       include: {
@@ -38,12 +44,23 @@ export class IncidentsService {
       },
     });
     if (!incident) throw new NotFoundException('Incident not found');
+
+    // Audit: log incident consultation
+    if (actingUserId) {
+      await this.audit.log({
+        userId: actingUserId,
+        action: 'INCIDENT_VIEWED',
+        metadata: { incident_id: id, severity: incident.severity },
+      });
+    }
+
     return incident;
   }
 
   async update(
     id: string,
     data: { status?: string; summary?: string; assigned_to?: string },
+    actingUserId?: string,
   ) {
     const incident = await this.prisma.incident.findUnique({ where: { id } });
     if (!incident) throw new NotFoundException('Incident not found');
@@ -51,9 +68,25 @@ export class IncidentsService {
     if (data.status === 'RESOLVED' || data.status === 'FALSE_POSITIVE') {
       updateData.resolved_at = new Date();
     }
-    return this.prisma.incident.update({
+    const updated = await this.prisma.incident.update({
       where: { id },
       data: updateData as any,
     });
+
+    // Audit: log incident processing
+    if (actingUserId) {
+      const metadata: Record<string, unknown> = { incident_id: id };
+      if (data.status && data.status !== incident.status) {
+        metadata.old_status = incident.status;
+        metadata.new_status = data.status;
+      }
+      await this.audit.log({
+        userId: actingUserId,
+        action: 'INCIDENT_UPDATED',
+        metadata,
+      });
+    }
+
+    return updated;
   }
 }

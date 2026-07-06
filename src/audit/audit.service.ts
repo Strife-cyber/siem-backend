@@ -1,9 +1,41 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+
+export interface AuditLogEntry {
+  userId: string;
+  action: string;
+  metadata?: Record<string, unknown>;
+  ipAddress?: string;
+  userAgent?: string;
+}
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Write an entry to the audit trail.
+   */
+  async log(entry: AuditLogEntry): Promise<void> {
+    try {
+      await this.prisma.auditTrail.create({
+        data: {
+          user_id: entry.userId,
+          action: entry.action,
+          metadata: (entry.metadata ?? undefined) as any,
+          ip_address: entry.ipAddress ?? undefined,
+          user_agent: entry.userAgent ?? undefined,
+        },
+      });
+    } catch (error) {
+      // Audit logging must never break the calling operation
+      this.logger.error(
+        `Failed to write audit trail for action="${entry.action}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   getTrail(filters: {
     user_id?: string;

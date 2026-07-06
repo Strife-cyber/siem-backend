@@ -21,6 +21,7 @@ import { ReportsModule } from './reports/reports.module';
 import { CorrelationModule } from './correlation/correlation.module';
 import { MailModule } from './mail/mail.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { FlaggedEventsModule } from './flagged-events/flagged-events.module';
 import { RequestLoggerMiddleware } from './common/request-logger.middleware';
 
 @Module({
@@ -46,6 +47,7 @@ import { RequestLoggerMiddleware } from './common/request-logger.middleware';
     CorrelationModule,
     MailModule,
     NotificationsModule,
+    FlaggedEventsModule,
   ],
   controllers: [AppController],
   providers: [

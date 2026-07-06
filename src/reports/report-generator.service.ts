@@ -3,8 +3,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 
-import PDFDocument from 'pdfkit';
-import { Workbook } from 'exceljs';
+import { Workbook, Worksheet } from 'exceljs';
+import { LatexReportService } from './latex-report.service';
 
 export interface ReportRequest {
   type: 'pdf' | 'excel' | 'csv';
@@ -21,12 +21,26 @@ export interface ReportMeta {
   expires_at: string;
 }
 
+function fmtDate(d?: string | Date): string {
+  if (!d) return '-';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function fmtDateShort(d?: string | Date): string {
+  if (!d) return '-';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return String(d).slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
 @Injectable()
 export class ReportGeneratorService {
   private readonly logger = new Logger(ReportGeneratorService.name);
   private readonly reportsDir: string;
 
-  constructor() {
+  constructor(private readonly latex: LatexReportService) {
     this.reportsDir =
       process.env.REPORTS_DIR || path.join(process.cwd(), 'reports');
     fs.mkdirSync(path.join(this.reportsDir, 'pdf'), { recursive: true });
@@ -55,436 +69,106 @@ export class ReportGeneratorService {
   }
 
   // ══════════════════════════════════════════════
-  //  PDF GENERATION
+  //  PDF GENERATION — LaTeX
   // ══════════════════════════════════════════════
-
-  /**
-   * Ensures there's at least `needed` points of vertical space left on the
-   * current page before drawing more content; otherwise starts a new page.
-   * Centralizing this avoids rows silently running past the bottom margin.
-   */
-  private ensureSpace(doc: PDFKit.PDFDocument, needed: number): void {
-    const bottom = doc.page.height - doc.page.margins.bottom;
-    if (doc.y + needed > bottom) {
-      doc.addPage();
-    }
-  }
-
-  /** Safe divisor helper — guards against 0 (not just null/undefined) causing NaN widths. */
-  private safeMax(value: number | undefined | null, fallback = 1): number {
-    return value && value > 0 ? value : fallback;
-  }
 
   private async generatePdf(
     data: any,
     request: ReportRequest,
   ): Promise<ReportMeta> {
-    const id = crypto.randomUUID();
-    const filename = `${request.start_date.slice(0, 10)}-report-${id.slice(0, 8)}.pdf`;
-    const filePath = path.join(this.reportsDir, 'pdf', filename);
-
-    const hasContent =
-      data?.overview || data?.incidents?.length > 0 || data?.logs?.length > 0;
-    if (!hasContent) {
-      this.logger.warn(
-        '[PDF] No data to generate report — creating summary-only PDF',
-      );
-    }
-
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const writeStream = fs.createWriteStream(filePath);
-    doc.pipe(writeStream);
-
-    // Cleanup helper shared by every failure path below.
-    const cleanupPartialFile = () => {
-      try {
-        writeStream.destroy();
-      } catch {
-        /* best-effort */
-      }
-      try {
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      } catch {
-        /* best-effort */
-      }
-    };
-
-    try {
-      const { overview, incidents, auditTrails } = data;
-      const severityDist: Record<string, number> =
-        overview?.severity_distribution ?? {};
-      const topSources = overview?.top_sources ?? [];
-      const threatTypes = overview?.threat_types ?? [];
-      const loginFailures = overview?.login_failures ?? [];
-      const stats = overview?.stats ?? {};
-
-      const sevColor = (s: string) =>
-        ({
-          CRITICAL: '#dc2626',
-          HIGH: '#ea580c',
-          WARNING: '#ca8a04',
-          INFO: '#2563eb',
-        })[s] ?? '#6b7280';
-
-      // ────── PAGE 1: HEADER ──────
-      doc
-        .fontSize(24)
-        .font('Helvetica-Bold')
-        .text('Smart SIEM CTU', { align: 'center' });
-      doc
-        .fontSize(16)
-        .font('Helvetica')
-        .text('Security Report', { align: 'center' });
-      doc.moveDown(0.5);
-      doc
-        .fontSize(10)
-        .fillColor('#64748b')
-        .text(
-          `Period: ${request.start_date.slice(0, 10)} to ${request.end_date.slice(0, 10)}`,
-          { align: 'center' },
-        );
-      doc.text(
-        `Generated: ${new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC`,
-        { align: 'center' },
-      );
-      doc.moveDown(1);
-
-      const status = (stats.system_status ?? 'OK').toUpperCase();
-      const statusColor = status === 'OK' ? '#22c55e' : '#dc2626';
-      this.ensureSpace(doc, 40);
-      const statusBoxY = doc.y;
-      doc.rect(50, statusBoxY, 495, 30).fill(statusColor);
-      doc
-        .fillColor('#ffffff')
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text(`System Status: ${status}`, 60, statusBoxY + 8);
-      doc.fillColor('#000000');
-      doc.y = statusBoxY + 40;
-
-      doc.moveDown(1);
-
-      // ────── PAGE 1: KEY METRICS ──────
-      this.ensureSpace(doc, 30);
-      doc.fontSize(14).font('Helvetica-Bold').text('Key Metrics');
-      doc.moveDown(0.5);
-
-      const totalCritical = severityDist.CRITICAL ?? 0;
-      const totalHigh = severityDist.HIGH ?? 0;
-      const openInc = stats.open_incidents ?? 0;
-      const logsPerHour = stats.logs_per_hour ?? 0;
-
-      const metrics: Array<{ label: string; value: number; color: string }> = [
-        { label: 'Total Incidents', value: openInc, color: '#2563eb' },
-        { label: 'Critical', value: totalCritical, color: '#dc2626' },
-        { label: 'High', value: totalHigh, color: '#ea580c' },
-        { label: 'Avg Logs/Hour', value: logsPerHour, color: '#6b7280' },
-      ];
-
-      const barX = 150;
-      const barMaxWidth = 350;
-      const maxMetric = this.safeMax(Math.max(...metrics.map((m) => m.value)));
-
-      for (const m of metrics) {
-        this.ensureSpace(doc, 24);
-        const rowY = doc.y;
-        doc
-          .fontSize(10)
-          .font('Helvetica')
-          .fillColor('#374151')
-          .text(m.label, 50, rowY + 2, { width: 90, lineBreak: false });
-        const barW = (m.value / maxMetric) * barMaxWidth;
-        doc.rect(barX, rowY, Math.max(barW, 1), 16).fill(m.color);
-        doc
-          .fillColor('#ffffff')
-          .fontSize(9)
-          .font('Helvetica-Bold')
-          .text(String(m.value), barX + 4, rowY + 3, { lineBreak: false });
-        doc.fillColor('#000000');
-        doc.y = rowY + 24;
-      }
-
-      doc.moveDown(1);
-
-      // ────── PAGE 2: SEVERITY DISTRIBUTION ──────
-      doc.addPage();
-      doc.fontSize(14).font('Helvetica-Bold').text('Severity Distribution');
-      doc.moveDown(0.5);
-
-      const totalSev = this.safeMax(
-        Object.values(severityDist).reduce((a: number, b: number) => a + b, 0),
-      );
-      const barY = doc.y;
-      let cumX = 50;
-      for (const [sev, cnt] of Object.entries(severityDist)) {
-        const pct = (cnt / totalSev) * 495;
-        doc.rect(cumX, barY, Math.max(pct, 1), 24).fill(sevColor(sev));
-        doc
-          .fillColor('#ffffff')
-          .fontSize(9)
-          .font('Helvetica-Bold')
-          .text(`${sev}: ${cnt}`, cumX + 4, barY + 6, { lineBreak: false });
-        cumX += pct;
-      }
-      doc.fillColor('#000000');
-      doc.y = barY + 24;
-      doc.moveDown(2);
-
-      // Table
-      this.ensureSpace(doc, 24);
-      doc.fontSize(10).font('Helvetica-Bold');
-      const sevTableHeaderY = doc.y;
-      doc.text('Severity', 50, sevTableHeaderY, { width: 100 });
-      doc.text('Count', 200, sevTableHeaderY, { width: 80 });
-      doc.text('Percentage', 300, sevTableHeaderY, { width: 100 });
-      doc.y = sevTableHeaderY + 16;
-      doc.rect(50, doc.y - 4, 495, 1).fill('#e5e7eb');
-
-      doc.font('Helvetica');
-      for (const [sev, cnt] of Object.entries(severityDist)) {
-        this.ensureSpace(doc, 18);
-        const rowY = doc.y + 4;
-        doc.fillColor('#374151').text(sev, 50, rowY, { width: 100 });
-        doc.text(String(cnt), 200, rowY, { width: 80 });
-        doc.text(`${((cnt / totalSev) * 100).toFixed(1)}%`, 300, rowY, {
-          width: 100,
-        });
-        doc.fillColor('#000000');
-        doc.y = rowY + 14;
-      }
-
-      doc.moveDown(1);
-
-      // ────── TOP SOURCES ──────
-      this.ensureSpace(doc, 30);
-      doc.fontSize(14).font('Helvetica-Bold').text('Top Source IPs');
-      doc.moveDown(0.5);
-      if (topSources.length > 0) {
-        const maxSrc = this.safeMax(topSources[0]?.count);
-        for (const s of topSources.slice(0, 10)) {
-          this.ensureSpace(doc, 20);
-          const rowY = doc.y;
-          const w = (s.count / maxSrc) * 350;
-          doc
-            .fontSize(9)
-            .font('Helvetica')
-            .fillColor('#374151')
-            .text(String(s.source_ip), 50, rowY + 2, {
-              width: 120,
-              lineBreak: false,
-            });
-          doc.rect(180, rowY, Math.max(w, 1), 14).fill('#3b82f6');
-          doc
-            .fillColor('#ffffff')
-            .fontSize(8)
-            .font('Helvetica-Bold')
-            .text(String(s.count), 184, rowY + 3, { lineBreak: false });
-          doc.fillColor('#000000');
-          doc.y = rowY + 18;
-        }
-      } else {
-        doc.fontSize(10).fillColor('#9ca3af').text('No data');
-      }
-      doc.fillColor('#000000');
-
-      // ────── PAGE 3: THREAT TYPES + LOGIN FAILURES ──────
-      doc.addPage();
-      doc.fontSize(14).font('Helvetica-Bold').text('Threat Types');
-      doc.moveDown(0.5);
-      if (threatTypes.length > 0) {
-        const maxThreat = this.safeMax(threatTypes[0]?.count);
-        for (const t of threatTypes.slice(0, 10)) {
-          this.ensureSpace(doc, 20);
-          const rowY = doc.y;
-          const w = (t.count / maxThreat) * 350;
-          doc
-            .fontSize(9)
-            .font('Helvetica')
-            .fillColor('#374151')
-            .text(String(t.type), 50, rowY + 2, {
-              width: 150,
-              lineBreak: false,
-            });
-          doc.rect(210, rowY, Math.max(w, 1), 14).fill('#8b5cf6');
-          doc
-            .fillColor('#ffffff')
-            .fontSize(8)
-            .font('Helvetica-Bold')
-            .text(String(t.count), 214, rowY + 3, { lineBreak: false });
-          doc.fillColor('#000000');
-          doc.y = rowY + 18;
-        }
-      } else {
-        doc.fontSize(10).fillColor('#9ca3af').text('No data');
-      }
-      doc.fillColor('#000000');
-      doc.moveDown(1.5);
-
-      // Login failures table
-      this.ensureSpace(doc, 30);
-      doc.fontSize(14).font('Helvetica-Bold').text('Login Failures');
-      doc.moveDown(0.5);
-      if (loginFailures.length > 0) {
-        doc.fontSize(9).font('Helvetica-Bold');
-        const lfHeaderY = doc.y;
-        doc.text('Period', 50, lfHeaderY, { width: 80 });
-        doc.text('Count', 160, lfHeaderY, { width: 50 });
-        doc.text('Threat Level', 230, lfHeaderY, { width: 100 });
-        doc.text('Description', 340, lfHeaderY, { width: 200 });
-        doc.y = lfHeaderY + 14;
-        doc.rect(50, doc.y - 3, 495, 1).fill('#e5e7eb');
-        doc.font('Helvetica');
-        for (const f of loginFailures.slice(0, 12)) {
-          this.ensureSpace(doc, 16);
-          const lvlColor =
-            f.threat_level === 'HIGH'
-              ? '#dc2626'
-              : f.threat_level === 'MEDIUM'
-                ? '#ca8a04'
-                : '#22c55e';
-          const rowY = doc.y + 3;
-          doc
-            .fillColor('#374151')
-            .text(String(f.label), 50, rowY, { width: 80 });
-          doc.text(String(f.count), 160, rowY, { width: 50 });
-          doc
-            .fillColor(lvlColor)
-            .text(String(f.threat_level), 230, rowY, { width: 100 });
-          doc
-            .fillColor('#374151')
-            .text(String(f.description ?? '').slice(0, 50), 340, rowY, {
-              width: 200,
-            });
-          doc.y = rowY + 13;
-        }
-      }
-      doc.fillColor('#000000');
-
-      // ────── PAGE 4: INCIDENTS + HUMAN ACTIONS ──────
-      doc.addPage();
-      doc.fontSize(14).font('Helvetica-Bold').text('Incidents');
-      doc.moveDown(0.5);
-      if (incidents.length > 0) {
-        doc.fontSize(8).font('Helvetica-Bold');
-        const incHeaderY = doc.y;
-        doc.text('Severity', 50, incHeaderY, { width: 55 });
-        doc.text('Rule', 115, incHeaderY, { width: 35 });
-        doc.text('Summary', 160, incHeaderY, { width: 350 });
-        doc.y = incHeaderY + 12;
-        doc.rect(50, doc.y - 3, 495, 1).fill('#e5e7eb');
-        doc.font('Helvetica');
-        for (const inc of incidents.slice(0, 20)) {
-          this.ensureSpace(doc, 14);
-          const rowY = doc.y + 3;
-          doc
-            .fillColor(sevColor(String(inc.severity)))
-            .text(String(inc.severity), 50, rowY, { width: 55 });
-          doc
-            .fillColor('#374151')
-            .text(String(inc.rule_id ?? '-'), 115, rowY, { width: 35 });
-          doc.text(String(inc.summary ?? '').slice(0, 90), 160, rowY, {
-            width: 350,
-          });
-          doc.y = rowY + 10;
-        }
-      } else {
-        doc.fontSize(10).fillColor('#9ca3af').text('No incidents');
-      }
-      doc.fillColor('#000000');
-      doc.moveDown(1.5);
-
-      // Human Actions
-      this.ensureSpace(doc, 30);
-      doc
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text('Human Actions (Audit Trail)');
-      doc.moveDown(0.5);
-      if (auditTrails.length > 0) {
-        doc.fontSize(8).font('Helvetica-Bold');
-        const atHeaderY = doc.y;
-        doc.text('User', 50, atHeaderY, { width: 60 });
-        doc.text('Action', 120, atHeaderY, { width: 120 });
-        doc.text('Time', 250, atHeaderY, { width: 140 });
-        doc.y = atHeaderY + 12;
-        doc.rect(50, doc.y - 3, 495, 1).fill('#e5e7eb');
-        doc.font('Helvetica');
-        for (const t of auditTrails.slice(0, 15)) {
-          this.ensureSpace(doc, 14);
-          const performedAt = t.performed_at
-            ? new Date(String(t.performed_at))
-                .toISOString()
-                .slice(0, 19)
-                .replace('T', ' ')
-            : '-';
-          const rowY = doc.y + 3;
-          doc
-            .fillColor('#374151')
-            .text(String(t.user_id ?? '-').slice(0, 8), 50, rowY, {
-              width: 60,
-            });
-          doc.text(String(t.action ?? '-'), 120, rowY, { width: 120 });
-          doc.text(performedAt, 250, rowY, { width: 140 });
-          doc.y = rowY + 10;
-        }
-      } else {
-        doc.fontSize(10).fillColor('#9ca3af').text('No audit trail entries');
-      }
-      doc.fillColor('#000000');
-    } catch (err) {
-      // A drawing call threw — the stream is still open, so make sure
-      // it's torn down and the partial file removed before we surface the error.
-      cleanupPartialFile();
-      throw new Error(
-        `PDF generation failed while rendering content: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
-
-    // Finalize PDF
-    try {
-      await new Promise<void>((resolve, reject) => {
-        writeStream.on('finish', resolve);
-        writeStream.on('close', resolve);
-        writeStream.on('error', reject);
-        doc.end();
-      });
-    } catch (err) {
-      cleanupPartialFile();
-      throw new Error(
-        `PDF generation failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`PDF file was not created at ${filePath}`);
-    }
-
-    const stat = fs.statSync(filePath);
-    if (stat.size < 100) {
-      this.logger.warn(
-        `[PDF] Generated file is very small (${stat.size} bytes) — possible empty PDF`,
-      );
-    }
+    const lateXMeta = await this.latex.generate(data, request);
 
     const meta: ReportMeta = {
-      id,
-      filename,
+      ...lateXMeta,
       type: 'pdf',
-      size_bytes: stat.size,
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
     this.logger.log(
-      `[PDF] Generated: ${filename} (${(stat.size / 1024).toFixed(1)}KB)`,
+      `[PDF] Generated: ${meta.filename} (${(meta.size_bytes / 1024).toFixed(1)} KB) — LaTeX`,
     );
     return meta;
   }
 
   // ══════════════════════════════════════════════
-  //  EXCEL GENERATION  (unchanged from original)
+  //  EXCEL GENERATION
   // ══════════════════════════════════════════════
+
+  private severityLabel(s: number): string {
+    return s >= 7
+      ? 'CRITICAL'
+      : s >= 5
+        ? 'HIGH'
+        : s >= 3
+          ? 'MEDIUM'
+          : s >= 1
+            ? 'LOW'
+            : 'INFO';
+  }
+
+  private styleHeaderRow(ws: Worksheet, rowNum = 1) {
+    const row = ws.getRow(rowNum);
+    row.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0F172A' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF334155' } },
+        bottom: { style: 'thin', color: { argb: 'FF334155' } },
+      };
+    });
+    row.height = 20;
+  }
+
+  private applyZebraAndBorders(
+    ws: Worksheet,
+    firstDataRow: number,
+    lastDataRow: number,
+  ) {
+    for (let r = firstDataRow; r <= lastDataRow; r++) {
+      const row = ws.getRow(r);
+      const isAlt = (r - firstDataRow) % 2 === 1;
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        if (isAlt) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8FAFC' },
+          };
+        }
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        };
+        cell.alignment = { ...cell.alignment, vertical: 'middle' };
+      });
+    }
+  }
+
+  private severityFillArgb(label: string): string {
+    return (
+      {
+        CRITICAL: 'FFFEE2E2',
+        HIGH: 'FFFFEDD5',
+        MEDIUM: 'FFFEF9C3',
+        LOW: 'FFDBEAFE',
+        INFO: 'FFDBEAFE',
+      }[label] ?? 'FFF1F5F9'
+    );
+  }
+
+  private severityFontArgb(label: string): string {
+    return (
+      {
+        CRITICAL: 'FF991B1B',
+        HIGH: 'FF9A3412',
+        MEDIUM: 'FF854D0E',
+        LOW: 'FF1E40AF',
+        INFO: 'FF1E40AF',
+      }[label] ?? 'FF334155'
+    );
+  }
 
   private async generateExcel(
     data: any,
@@ -493,74 +177,158 @@ export class ReportGeneratorService {
     const id = crypto.randomUUID();
     const filename = `${request.start_date.slice(0, 10)}-events-${id.slice(0, 8)}.xlsx`;
     const filePath = path.join(this.reportsDir, 'xlsx', filename);
+    const period = `${fmtDateShort(request.start_date)} to ${fmtDateShort(request.end_date)}`;
+
     const wb = new Workbook();
     wb.creator = 'Smart SIEM CTU';
     wb.created = new Date();
 
-    const ws1 = wb.addWorksheet('Events');
+    // ────── SUMMARY SHEET (first, so it's what opens by default) ──────
+    const ws2 = wb.addWorksheet('Summary', {
+      properties: { tabColor: { argb: 'FF2563EB' } },
+      views: [{ showGridLines: false }],
+    });
+    ws2.columns = [{ width: 4 }, { width: 30 }, { width: 18 }, { width: 40 }];
+
+    ws2.mergeCells('B2:D2');
+    const titleCell = ws2.getCell('B2');
+    titleCell.value = 'Smart SIEM CTU — Security Report';
+    titleCell.font = { bold: true, size: 16, color: { argb: 'FF0F172A' } };
+
+    ws2.mergeCells('B3:D3');
+    const subCell = ws2.getCell('B3');
+    subCell.value = `Reporting period: ${period}  •  Generated ${fmtDate(new Date())} UTC`;
+    subCell.font = { size: 10, color: { argb: 'FF64748B' } };
+
+    const overview = data.overview ?? {};
+    const severityDist: Record<string, number> =
+      overview.severity_distribution ?? {};
+    const stats = overview.stats ?? {};
+
+    ws2.mergeCells('B5:D5');
+    ws2.getCell('B5').value = 'Key Metrics';
+    ws2.getCell('B5').font = {
+      bold: true,
+      size: 12,
+      color: { argb: 'FF0F172A' },
+    };
+
+    const metricRows: Array<[string, number | string]> = [
+      ['Total Incidents', data.incidents.length],
+      ['Total Log Events', data.logs.length],
+      ['Critical Events', severityDist.CRITICAL ?? 0],
+      ['High Severity Events', severityDist.HIGH ?? 0],
+      ['Warning Events', severityDist.WARNING ?? 0],
+      ['Info Events', severityDist.INFO ?? 0],
+      ['Avg Logs / Hour', stats.logs_per_hour ?? 0],
+      ['System Status', stats.system_status ?? 'OK'],
+    ];
+
+    let r = 6;
+    for (const [label, value] of metricRows) {
+      ws2.getCell(`B${r}`).value = label;
+      ws2.getCell(`B${r}`).font = { color: { argb: 'FF334155' } };
+      ws2.mergeCells(`C${r}:D${r}`);
+      const valCell = ws2.getCell(`C${r}`);
+      valCell.value = value;
+      valCell.font = { bold: true, color: { argb: 'FF0F172A' } };
+      valCell.alignment = { horizontal: 'left' };
+      ws2.getRow(r).eachCell({ includeEmpty: false }, (c) => {
+        c.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
+      });
+      r++;
+    }
+
+    r += 1;
+    ws2.mergeCells(`B${r}:D${r}`);
+    ws2.getCell(`B${r}`).value = 'Severity Breakdown';
+    ws2.getCell(`B${r}`).font = {
+      bold: true,
+      size: 12,
+      color: { argb: 'FF0F172A' },
+    };
+    r++;
+    const sevHeaderRow = r;
+    ws2.getCell(`B${r}`).value = 'Severity';
+    ws2.getCell(`C${r}`).value = 'Count';
+    ws2.getCell(`D${r}`).value = 'Share';
+    this.styleHeaderRow(ws2, sevHeaderRow);
+    // header only spans B:D here, blank col A stays untouched
+    ws2.getCell(`A${sevHeaderRow}`).fill = undefined as any;
+    r++;
+    const totalSev =
+      Object.values(severityDist).reduce((a, b) => a + b, 0) || 1;
+    const sevFirstRow = r;
+    for (const [sev, count] of Object.entries(severityDist)) {
+      ws2.getCell(`B${r}`).value = sev;
+      ws2.getCell(`C${r}`).value = count;
+      ws2.getCell(`D${r}`).value = `${((count / totalSev) * 100).toFixed(1)}%`;
+      const label = sev.toUpperCase();
+      ws2.getCell(`B${r}`).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: this.severityFillArgb(label) },
+      };
+      ws2.getCell(`B${r}`).font = {
+        bold: true,
+        color: { argb: this.severityFontArgb(label) },
+      };
+      r++;
+    }
+    this.applyZebraAndBorders(ws2, sevFirstRow, r - 1);
+
+    // ────── EVENTS SHEET ──────
+    const ws1 = wb.addWorksheet('Events', {
+      views: [{ state: 'frozen', ySplit: 1, showGridLines: false }],
+    });
     ws1.columns = [
-      { header: 'Timestamp', key: 'collected_at', width: 22 },
-      { header: 'Source IP', key: 'source_ip', width: 18 },
-      { header: 'Destination IP', key: 'destination_ip', width: 18 },
+      { header: 'Timestamp', key: 'collected_at', width: 20 },
+      { header: 'Source IP', key: 'source_ip', width: 16 },
+      { header: 'Destination IP', key: 'destination_ip', width: 16 },
       { header: 'Username', key: 'user_principal', width: 18 },
       { header: 'Event Type', key: 'event_taxonomy', width: 22 },
       { header: 'Severity', key: 'severity_label', width: 12 },
-      { header: 'Machine', key: 'hostname', width: 20 },
+      { header: 'Machine', key: 'hostname', width: 18 },
       { header: 'Action', key: 'action', width: 16 },
       { header: 'Outcome', key: 'outcome', width: 12 },
-      { header: 'Hash ID', key: 'ingestion_hash', width: 28 },
+      { header: 'Hash ID', key: 'ingestion_hash', width: 20 },
     ];
+    this.styleHeaderRow(ws1, 1);
 
-    const severityLabel = (s: number) =>
-      s >= 7
-        ? 'CRITICAL'
-        : s >= 5
-          ? 'HIGH'
-          : s >= 3
-            ? 'MEDIUM'
-            : s >= 1
-              ? 'LOW'
-              : 'INFO';
-
-    const headerRow = ws1.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1E293B' },
-    };
-    headerRow.alignment = { horizontal: 'center' };
-
-    for (const log of data.logs.slice(0, 100000)) {
-      ws1.addRow({
-        collected_at: log.collected_at,
+    const logs = data.logs.slice(0, 100000);
+    for (const log of logs) {
+      const label = this.severityLabel(Number(log.severity));
+      const row = ws1.addRow({
+        collected_at: fmtDate(log.collected_at),
         source_ip: log.source_ip,
         destination_ip: log.destination_ip ?? '',
         user_principal: log.user_principal ?? '',
         event_taxonomy: log.event_taxonomy,
-        severity_label: severityLabel(Number(log.severity)),
+        severity_label: label,
         hostname: log.hostname,
         action: log.action,
         outcome: log.outcome ?? '',
         ingestion_hash: (log.ingestion_hash ?? '').slice(0, 16),
       });
+      const sevCell = row.getCell('severity_label');
+      sevCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: this.severityFillArgb(label) },
+      };
+      sevCell.font = {
+        bold: true,
+        color: { argb: this.severityFontArgb(label) },
+      };
+      sevCell.alignment = { horizontal: 'center' };
     }
-
-    const ws2 = wb.addWorksheet('Summary');
-    const overview = data.overview ?? {};
-    const severityDist = overview.severity_distribution ?? {};
-
-    ws2.addRow(['Metric', 'Value']);
-    ws2.addRow(['Total Incidents', data.incidents.length]);
-    ws2.addRow(['Total Logs', data.logs.length]);
-    ws2.addRow(['Critical', severityDist.CRITICAL ?? 0]);
-    ws2.addRow(['High', severityDist.HIGH ?? 0]);
-    ws2.addRow(['Warning', severityDist.WARNING ?? 0]);
-    ws2.addRow(['Info', severityDist.INFO ?? 0]);
-    ws2.addRow(['Avg Logs/Hour', overview.stats?.logs_per_hour ?? 0]);
-    ws2.addRow(['System Status', overview.stats?.system_status ?? 'OK']);
-
-    ws2.getRow(1).font = { bold: true };
+    if (logs.length > 0) {
+      this.applyZebraAndBorders(ws1, 2, logs.length + 1);
+      ws1.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: logs.length + 1, column: ws1.columns.length },
+      };
+    }
 
     try {
       await wb.xlsx.writeFile(filePath);
@@ -571,7 +339,9 @@ export class ReportGeneratorService {
         /* best-effort cleanup */
       }
       throw new Error(
-        `Excel generation failed: ${err instanceof Error ? err.message : String(err)}`,
+        `Excel generation failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
     }
 
@@ -589,13 +359,13 @@ export class ReportGeneratorService {
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
     this.logger.log(
-      `[Excel] Generated: ${filename} (${(stat.size / 1024).toFixed(1)}KB)`,
+      `[Excel] Generated: ${filename} (${(stat.size / 1024).toFixed(1)} KB)`,
     );
     return meta;
   }
 
   // ══════════════════════════════════════════════
-  //  CSV GENERATION  (unchanged from original)
+  //  CSV GENERATION
   // ══════════════════════════════════════════════
 
   private async generateCsv(
@@ -605,17 +375,6 @@ export class ReportGeneratorService {
     const id = crypto.randomUUID();
     const filename = `${request.start_date.slice(0, 10)}-events-${id.slice(0, 8)}.csv`;
     const filePath = path.join(this.reportsDir, 'csv', filename);
-
-    const severityLabel = (s: number) =>
-      s >= 7
-        ? 'CRITICAL'
-        : s >= 5
-          ? 'HIGH'
-          : s >= 3
-            ? 'MEDIUM'
-            : s >= 1
-              ? 'LOW'
-              : 'INFO';
 
     const escape = (v: any) => {
       const s = String(v ?? '');
@@ -630,12 +389,12 @@ export class ReportGeneratorService {
       .slice(0, 200000)
       .map((log: any) =>
         [
-          log.collected_at,
+          fmtDate(log.collected_at),
           log.source_ip,
           log.destination_ip ?? '',
           log.user_principal ?? '',
           log.event_taxonomy,
-          severityLabel(Number(log.severity)),
+          this.severityLabel(Number(log.severity)),
           log.hostname,
           log.action,
           log.outcome ?? '',
@@ -658,16 +417,11 @@ export class ReportGeneratorService {
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
     this.logger.log(
-      `[CSV] Generated: ${filename} (${(stat.size / 1024).toFixed(1)}KB)`,
+      `[CSV] Generated: ${filename} (${(stat.size / 1024).toFixed(1)} KB)`,
     );
     return meta;
   }
 
-  /**
-   * Resolves a report filename to a full path. Sanitized against traversal:
-   * only a bare filename (no path separators, no "..") is accepted, since
-   * this is joined with a trusted base directory.
-   */
   getFilePath(filename: string): string | null {
     const base = path.basename(filename);
     if (base !== filename || base.includes('..')) {
@@ -700,7 +454,7 @@ export class ReportGeneratorService {
   }
 
   cleanup(): void {
-    const dirs = ['pdf', 'xlsx', 'csv'];
+    const dirs = ['pdf', 'xlsx', 'csv', 'latex'];
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     for (const dir of dirs) {
       const fullDir = path.join(this.reportsDir, dir);

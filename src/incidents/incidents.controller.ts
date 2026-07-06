@@ -8,6 +8,7 @@ import {
 } from '@nestjs/swagger';
 import { IncidentsService } from './incidents.service';
 import { IncidentUpdateDto } from './dto/incident-update.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Incidents')
 @ApiBearerAuth('BearerAuth')
@@ -42,8 +43,11 @@ export class IncidentsController {
   @Get(':incidentId')
   @ApiOperation({ summary: 'Get full incident details' })
   @ApiOkResponse({ description: 'Incident details' })
-  async getIncident(@Param('incidentId') incidentId: string) {
-    return this.incidentsService.findOne(incidentId);
+  async getIncident(
+    @Param('incidentId') incidentId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.incidentsService.findOne(incidentId, userId);
   }
 
   @Patch(':incidentId')
@@ -52,7 +56,8 @@ export class IncidentsController {
   async updateIncident(
     @Param('incidentId') incidentId: string,
     @Body() dto: IncidentUpdateDto,
+    @CurrentUser('sub') userId: string,
   ) {
-    return this.incidentsService.update(incidentId, dto);
+    return this.incidentsService.update(incidentId, dto, userId);
   }
 }

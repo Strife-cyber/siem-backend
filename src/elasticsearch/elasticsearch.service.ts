@@ -209,7 +209,7 @@ export class ElasticsearchService implements OnModuleInit {
     }
 
     const body = logs.flatMap((log) => [
-      { index: { _index: LOGS_ALIAS } },
+      { index: { _index: LOGS_ALIAS, _id: log.ingestion_hash } },
       log,
     ]);
 

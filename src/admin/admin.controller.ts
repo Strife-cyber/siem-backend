@@ -17,6 +17,7 @@ import {
   ApiCreatedResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../generated/prisma/enums';
 import { AdminService } from './admin.service';
 import {
@@ -42,8 +43,11 @@ export class AdminController {
   @Post('users')
   @ApiOperation({ summary: 'Create a new user (ADMIN only)' })
   @ApiCreatedResponse({ description: 'User created' })
-  async createUser(@Body() dto: CreateUserDto) {
-    return this.adminService.createUser(dto);
+  async createUser(
+    @Body() dto: CreateUserDto,
+    @CurrentUser('sub') actingUserId: string,
+  ) {
+    return this.adminService.createUser(dto, actingUserId);
   }
 
   @Put('users/:userId')
@@ -52,16 +56,20 @@ export class AdminController {
   async updateUser(
     @Param('userId') userId: string,
     @Body() dto: UpdateUserDto,
+    @CurrentUser('sub') actingUserId: string,
   ) {
-    return this.adminService.updateUser(userId, dto);
+    return this.adminService.updateUser(userId, dto, actingUserId);
   }
 
   @Delete('users/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete/deactivate user (ADMIN only)' })
   @ApiOkResponse({ description: 'Deleted' })
-  async deleteUser(@Param('userId') userId: string) {
-    await this.adminService.deleteUser(userId);
+  async deleteUser(
+    @Param('userId') userId: string,
+    @CurrentUser('sub') actingUserId: string,
+  ) {
+    await this.adminService.deleteUser(userId, actingUserId);
   }
 
   @Get('retention')

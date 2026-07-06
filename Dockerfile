@@ -17,7 +17,7 @@ RUN npm run build
 # ---- Production Stage ----
 FROM node:20-alpine AS production
 
-RUN apk add --no-cache wget
+RUN apk add --no-cache wget texlive
 
 WORKDIR /usr/src/app
 

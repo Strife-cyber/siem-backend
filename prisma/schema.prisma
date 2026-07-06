@@ -66,6 +66,7 @@ model User {
   triggered_playbooks PlaybookExecution[] @relation("triggered_playbooks")
   audit_trails        AuditTrail[]
   mfa_sessions        MfaSession[]
+  flagged_events      FlaggedEvent[]
 
   @@map("users")
 }
@@ -181,6 +182,49 @@ model AuditTrail {
   @@index([performed_at], name: "idx_audit_performed_at")
   @@index([user_id, action], name: "idx_audit_user_action")
   @@map("audit_trail")
+}
+
+model FlaggedEvent {
+  id                String    @id @default(uuid()) @db.Uuid
+  ingestion_hash    String    @unique @db.VarChar(64)
+  user_id           String    @db.Uuid
+  reason            String?   @db.Text
+  status            FlaggedEventStatus @default(OPEN)
+  investigation_id  String?   @db.Uuid
+  event_snapshot    Json?
+  flagged_at        DateTime  @default(now()) @db.Timestamptz()
+  resolved_at       DateTime? @db.Timestamptz()
+
+  user        User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  links_out   FlaggedEventLink[] @relation("linked_from")
+  links_in    FlaggedEventLink[] @relation("linked_to")
+
+  @@index([ingestion_hash])
+  @@index([status])
+  @@index([investigation_id])
+  @@index([flagged_at])
+  @@map("flagged_events")
+}
+
+enum FlaggedEventStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+model FlaggedEventLink {
+  id            String   @id @default(uuid()) @db.Uuid
+  from_event_id String   @db.Uuid
+  to_event_id   String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz()
+  link_type     String   @default("RELATED") @db.VarChar(50)
+
+  from_event FlaggedEvent @relation("linked_from", fields: [from_event_id], references: [id], onDelete: Cascade)
+  to_event   FlaggedEvent @relation("linked_to", fields: [to_event_id], references: [id], onDelete: Cascade)
+
+  @@unique([from_event_id, to_event_id])
+  @@map("flagged_event_links")
 }
 
 model RetentionPolicy {

@@ -2,18 +2,23 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '../../generated/prisma/enums';
+import { AuditService } from '../audit/audit.service';
 import { MfaService } from './mfa.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly audit: AuditService,
     private readonly mfa: MfaService,
   ) {}
 
@@ -35,15 +40,37 @@ export class AuthService {
     };
   }
 
-  async signIn(username: string, password: string) {
+  async signIn(
+    username: string,
+    password: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const user = await this.validateUser(username, password);
     if (!user) {
+      // Audit: log failed login attempt (no user id available — log with empty)
+      await this.audit.log({
+        userId: 'unknown',
+        action: 'LOGIN_FAILED',
+        metadata: { username, reason: 'invalid_credentials' },
+        ipAddress,
+        userAgent,
+      });
       throw new UnauthorizedException('Invalid username or password');
     }
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: { last_login: new Date() },
+    });
+
+    // Audit: log successful login
+    await this.audit.log({
+      userId: user.id,
+      action: 'LOGIN',
+      metadata: { username },
+      ipAddress,
+      userAgent,
     });
 
     // If MFA is enabled, send OTP and require verification
@@ -71,6 +98,8 @@ export class AuthService {
     password: string,
     role?: UserRole,
     email?: string,
+    ipAddress?: string,
+    userAgent?: string,
   ) {
     const existingUser = await this.prisma.user.findUnique({
       where: { username },
@@ -96,6 +125,15 @@ export class AuthService {
         role: true,
         created_at: true,
       },
+    });
+
+    // Audit: log user registration
+    await this.audit.log({
+      userId: user.id,
+      action: 'USER_REGISTERED',
+      metadata: { username, role: user.role },
+      ipAddress,
+      userAgent,
     });
 
     return user;

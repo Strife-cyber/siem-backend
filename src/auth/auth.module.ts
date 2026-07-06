@@ -7,6 +7,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { MfaService } from './mfa.service';
 import { MailModule } from '../mail/mail.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { MailModule } from '../mail/mail.module';
       signOptions: { expiresIn: '24h' },
     }),
     MailModule,
+    AuditModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, MfaService, LocalStrategy, JwtStrategy],

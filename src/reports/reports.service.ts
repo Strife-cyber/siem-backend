@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { ElasticsearchService } from '../elasticsearch/elasticsearch.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DashboardService } from '../dashboard/dashboard.service';
+import { MailService } from '../mail/mail.service';
 import {
   ReportGeneratorService,
   type ReportMeta,
@@ -22,6 +25,7 @@ export class ReportsService {
     private readonly prisma: PrismaService,
     private readonly dashboard: DashboardService,
     private readonly generator: ReportGeneratorService,
+    private readonly mail: MailService,
   ) {}
 
   async generate(
@@ -73,6 +77,7 @@ export class ReportsService {
             where: { performed_at: { gte: dateFrom, lte: dateTo } },
             orderBy: { performed_at: 'desc' },
             take: 200,
+            include: { user: { select: { role: true } } },
           }),
           this.prisma.uebaProfile.findMany({
             orderBy: { risk_score: 'desc' },
@@ -85,6 +90,15 @@ export class ReportsService {
         request,
       );
       this.pendingJobs.set(jobId, { status: 'ready', meta });
+
+      // Auto-send PDF report to configured admins
+      if (meta.type === 'pdf') {
+        this.sendReportEmail(meta, request).catch((err) =>
+          this.logger.error(
+            `[Reports] Failed to email report ${meta.filename}: ${err.message}`,
+          ),
+        );
+      }
     } catch (err: any) {
       this.pendingJobs.set(jobId, { status: 'failed' });
       throw err;
@@ -109,6 +123,81 @@ export class ReportsService {
 
   async cleanup() {
     this.generator.cleanup();
+  }
+
+  /** Send the generated PDF report to configured admin recipients */
+  private async sendReportEmail(
+    meta: ReportMeta,
+    request: ReportRequest,
+  ): Promise<void> {
+    const recipients = (process.env.ALERT_EMAIL_TO || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (recipients.length === 0) {
+      this.logger.log(
+        '[Reports] No ALERT_EMAIL_TO configured — skipping report email',
+      );
+      return;
+    }
+
+    const filePath = this.generator.getFilePath(meta.filename);
+    if (!filePath || !fs.existsSync(filePath)) {
+      this.logger.warn(
+        `[Reports] Report file not found for email: ${meta.filename}`,
+      );
+      return;
+    }
+
+    const period = `${request.start_date.slice(0, 10)} — ${request.end_date.slice(0, 10)}`;
+    const reportName = meta.filename.replace('.pdf', '');
+
+    await this.mail.sendEmailWithAttachment({
+      to: recipients,
+      subject: `[SIEM] Rapport de Sécurité — ${period}`,
+      html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: 'Helvetica Neue', Arial, sans-serif; background: #f8fafc; padding: 24px;">
+  <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <div style="background: #0f172a; padding: 24px 32px;">
+      <h1 style="color: #dbeafe; margin: 0; font-size: 20px;">SMART SIEM CTU</h1>
+      <p style="color: #94a3b8; margin: 4px 0 0;">Rapport de Sécurité</p>
+    </div>
+    <div style="padding: 32px;">
+      <h2 style="color: #0f172a; margin: 0 0 8px;">Rapport prêt</h2>
+      <p style="color: #475569; margin: 0 0 20px;">
+        Le rapport de sécurité pour la période <strong>${period}</strong> a été généré avec succès.
+      </p>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Fichier</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-weight: bold;">${meta.filename}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Taille</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-weight: bold;">${(meta.size_bytes / 1024).toFixed(1)} KB</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Période</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-weight: bold;">${period}</td>
+        </tr>
+      </table>
+      <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+        Le rapport PDF est joint à cet email.
+      </p>
+    </div>
+    <div style="background: #f1f5f9; padding: 12px 32px; text-align: center;">
+      <p style="color: #94a3b8; font-size: 11px; margin: 0;">
+        Document Confidentiel — Smart SIEM CTU &copy; ${new Date().getFullYear()}
+      </p>
+    </div>
+  </div>
+</body>
+</html>`,
+      text: `Smart SIEM CTU — Rapport de Sécurité\n\nPériode: ${period}\nFichier: ${meta.filename}\nTaille: ${(meta.size_bytes / 1024).toFixed(1)} KB\n\nLe rapport PDF est joint à cet email.\n\nDocument Confidentiel`,
+      attachment: { filename: meta.filename, path: filePath },
+    });
   }
 
   private async fetchLogs(dateFrom: Date, dateTo: Date): Promise<any[]> {

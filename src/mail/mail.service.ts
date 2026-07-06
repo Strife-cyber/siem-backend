@@ -166,6 +166,58 @@ export class MailService {
     });
   }
 
+  /**
+   * Send an email with a file attachment (typically a PDF report).
+   * The attachment is read from disk and embedded in the message.
+   */
+  async sendEmailWithAttachment(options: {
+    to: string | string[];
+    subject: string;
+    html: string;
+    attachment: { filename: string; path: string };
+    text?: string;
+  }): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.log(
+        `[Mail] [DRY-RUN] To: ${options.to} | Subject: ${options.subject} | Attachment: ${options.attachment.filename}`,
+      );
+      return true;
+    }
+
+    try {
+      // Verify the attachment exists before sending
+      if (!fs.existsSync(options.attachment.path)) {
+        this.logger.error(
+          `[Mail] Attachment not found: ${options.attachment.path}`,
+        );
+        return false;
+      }
+
+      await this.transporter.sendMail({
+        from: this.from,
+        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: [
+          {
+            filename: options.attachment.filename,
+            path: options.attachment.path,
+          },
+        ],
+      });
+      this.logger.log(
+        `[Mail] Sent with attachment to ${options.to}: "${options.subject}" (${options.attachment.filename})`,
+      );
+      return true;
+    } catch (err: any) {
+      this.logger.error(
+        `[Mail] Failed to send with attachment to ${options.to}: ${err.message}`,
+      );
+      return false;
+    }
+  }
+
   async sendDailyDigest(data: {
     date: string;
     total: number;

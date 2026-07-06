@@ -5,6 +5,7 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,6 +14,7 @@ import {
   ApiOkResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { SignInDto } from './dto/sign-in.dto';
 import { SignUpDto } from './dto/sign-up.dto';
@@ -30,8 +32,13 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Authenticate user and get JWT' })
   @ApiOkResponse({ description: 'Returns JWT or mfa_required' })
-  async signIn(@Body() dto: SignInDto) {
-    return this.authService.signIn(dto.username, dto.password);
+  async signIn(@Body() dto: SignInDto, @Req() req: Request) {
+    return this.authService.signIn(
+      dto.username,
+      dto.password,
+      req.ip,
+      req.headers['user-agent'],
+    );
   }
 
   @Public()
@@ -48,12 +55,14 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiCreatedResponse({ description: 'User registered successfully' })
-  async signUp(@Body() dto: SignUpDto) {
+  async signUp(@Body() dto: SignUpDto, @Req() req: Request) {
     return this.authService.signUp(
       dto.username,
       dto.password,
       dto.role,
       dto.email,
+      req.ip,
+      req.headers['user-agent'],
     );
   }
 
