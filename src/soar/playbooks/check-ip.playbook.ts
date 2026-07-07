@@ -1,16 +1,14 @@
 import { Logger } from '@nestjs/common';
-import type {
-  PfSenseClientService,
-  PfSenseRule,
-} from '../pfsense-client.service';
+import type { IFirewallAgent } from '../agents/firewall-agent.interface';
+import type { CheckIpResponse } from '../agents/firewall-agent.interface';
 
 export async function checkIpPlaybook(
-  pfsense: PfSenseClientService,
+  agent: IFirewallAgent,
   ip: string,
   logger: Logger,
-): Promise<{ blocked: boolean; rules: PfSenseRule[] }> {
+): Promise<CheckIpResponse> {
   try {
-    const result = await pfsense.checkIP(ip);
+    const result = await agent.checkIp(ip);
     if (result.blocked) {
       logger.warn(
         `[check_ip] ${ip} is BLOCKED by ${result.rules.length} rule(s)`,

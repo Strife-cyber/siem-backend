@@ -2,10 +2,13 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   Param,
   HttpCode,
   HttpStatus,
+  Inject,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,8 +17,10 @@ import {
   ApiOkResponse,
   ApiCreatedResponse,
 } from '@nestjs/swagger';
+import { FIREWALL_AGENT } from './agents/firewall-agent.interface';
+import type { IFirewallAgent } from './agents/firewall-agent.interface';
 import { SoarService } from './soar.service';
-import { PfSenseClientService } from './pfsense-client.service';
+import { PfSenseAgentService } from './agents/pfsense-agent.service';
 import {
   PlaybookExecutionDto,
   AbortPlaybookDto,
@@ -23,6 +28,7 @@ import {
   DirectBlockPortDto,
   DirectTempBlockDto,
   DirectAliasDto,
+  UnblockIpDto,
 } from './dto/soar.dto';
 import { blockIpPlaybook } from './playbooks/block-ip.playbook';
 import { blockPortPlaybook } from './playbooks/block-port.playbook';
@@ -42,8 +48,12 @@ export class SoarController {
 
   constructor(
     private readonly soarService: SoarService,
-    private readonly pfsense: PfSenseClientService,
+    @Inject(FIREWALL_AGENT) private readonly agent: IFirewallAgent,
   ) {}
+
+  // ══════════════════════════════════════════════════
+  //  Playbook execution
+  // ══════════════════════════════════════════════════
 
   @Post('execute')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -61,12 +71,16 @@ export class SoarController {
     return this.soarService.abortPlaybook(dto.execution_id);
   }
 
+  // ══════════════════════════════════════════════════
+  //  Direct firewall actions (provider-agnostic)
+  // ══════════════════════════════════════════════════
+
   @Post('block-ip')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Directly block an IP on pfSense' })
+  @ApiOperation({ summary: 'Block an IP address on the active firewall' })
   async directBlockIp(@Body() dto: DirectBlockIpDto) {
     const result = await blockIpPlaybook(
-      this.pfsense,
+      this.agent,
       [dto.ip],
       dto.reason ?? 'Manual block',
       this.logger,
@@ -76,10 +90,10 @@ export class SoarController {
 
   @Post('block-port')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Block a specific port from an IP on pfSense' })
+  @ApiOperation({ summary: 'Block a specific port from an IP on the active firewall' })
   async directBlockPort(@Body() dto: DirectBlockPortDto) {
     const result = await blockPortPlaybook(
-      this.pfsense,
+      this.agent,
       [{ ip: dto.ip, port: dto.port, protocol: dto.protocol }],
       dto.reason ?? 'Manual port block',
       this.logger,
@@ -92,7 +106,7 @@ export class SoarController {
   @ApiOperation({ summary: 'Temporarily block an IP for a given duration' })
   async directTempBlock(@Body() dto: DirectTempBlockDto) {
     const result = await temporaryBlockPlaybook(
-      this.pfsense,
+      this.agent,
       undefined,
       [dto.ip],
       dto.reason ?? 'Temporary manual block',
@@ -104,17 +118,49 @@ export class SoarController {
   }
 
   @Get('check-ip/:ip')
-  @ApiOperation({ summary: 'Check if an IP is blocked on pfSense' })
+  @ApiOperation({ summary: 'Check if an IP is blocked on the active firewall' })
   async directCheckIp(@Param('ip') ip: string) {
-    return checkIpPlaybook(this.pfsense, ip, this.logger);
+    return checkIpPlaybook(this.agent, ip, this.logger);
   }
+
+  @Post('unblock-ip')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Unblock an IP address on the active firewall' })
+  async unblockIp(@Body() dto: UnblockIpDto) {
+    return this.agent.unblockIp(dto.ip);
+  }
+
+  @Get('rules')
+  @ApiOperation({ summary: 'List all firewall rules managed by Smart SIEM' })
+  async listRules() {
+    return this.agent.listRules();
+  }
+
+  @Delete('rule/:name')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a specific firewall rule by its name' })
+  async deleteRule(@Param('name') name: string) {
+    return this.agent.deleteRule(name);
+  }
+
+  @Get('health')
+  @ApiOperation({ summary: 'Get the active firewall provider health status' })
+  async healthCheck() {
+    return this.agent.healthCheck();
+  }
+
+  // ══════════════════════════════════════════════════
+  //  Direct firewall actions (pfSense-specific)
+  // ══════════════════════════════════════════════════
 
   @Post('aliases')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Create an IP alias on pfSense' })
+  @ApiOperation({ summary: 'Create an IP alias on pfSense (pfSense only)' })
   async createAlias(@Body() dto: DirectAliasDto) {
+    this.ensurePfSense('create aliases');
+    const pfsense = this.agent as unknown as PfSenseAgentService;
     return createAliasPlaybook(
-      this.pfsense,
+      pfsense,
       dto.name,
       dto.addresses,
       dto.description ?? 'Smart SIEM alias',
@@ -124,24 +170,46 @@ export class SoarController {
 
   @Post('aliases/:id/delete')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Delete an IP alias from pfSense by its ID' })
+  @ApiOperation({ summary: 'Delete an IP alias from pfSense by its ID (pfSense only)' })
   async deleteAlias(@Param('id') id: string) {
-    return deleteAliasPlaybook(this.pfsense, id, this.logger);
+    this.ensurePfSense('delete aliases');
+    const pfsense = this.agent as unknown as PfSenseAgentService;
+    return deleteAliasPlaybook(pfsense, id, this.logger);
   }
 
   @Get('aliases')
-  @ApiOperation({ summary: 'List all aliases from pfSense' })
+  @ApiOperation({ summary: 'List all aliases from pfSense (pfSense only)' })
   async listAliases() {
-    const result = await this.pfsense.listAliases();
+    this.ensurePfSense('list aliases');
+    const pfsense = this.agent as unknown as PfSenseAgentService;
+    const result = await pfsense.listAliases();
     return result.data ?? [];
   }
 
+  // ══════════════════════════════════════════════════
+  //  Status (provider-agnostic, alias of health)
+  // ══════════════════════════════════════════════════
+
   @Get('status')
-  @ApiOperation({ summary: 'Get pfSense connection status and stats' })
+  @ApiOperation({ summary: 'Get the active firewall provider status' })
   @ApiOkResponse({
-    description: 'pfSense status with version, rules count, aliases count',
+    description: 'Firewall provider status with version, rules count, etc.',
   })
   async getStatus() {
-    return this.pfsense.getStatus();
+    return this.agent.healthCheck();
+  }
+
+  // ══════════════════════════════════════════════════
+  //  Helpers
+  // ══════════════════════════════════════════════════
+
+  private ensurePfSense(operation: string): void {
+    if (this.agent.provider !== 'pfsense') {
+      throw new BadRequestException(
+        `Cannot ${operation}: this operation requires the pfSense firewall provider. ` +
+          `Current provider: ${this.agent.provider}. ` +
+          `Set SOAR_FIREWALL_PROVIDER=pfsense in your environment.`,
+      );
+    }
   }
 }

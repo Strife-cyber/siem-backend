@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
-import type { PfSenseClientService } from '../pfsense-client.service';
+import type { PfSenseAgentService } from '../agents/pfsense-agent.service';
 
 export async function createAliasPlaybook(
-  pfsense: PfSenseClientService,
+  pfsense: PfSenseAgentService,
   name: string,
   ips: string[],
   description: string,
@@ -23,7 +23,7 @@ export async function createAliasPlaybook(
 }
 
 export async function deleteAliasPlaybook(
-  pfsense: PfSenseClientService,
+  pfsense: PfSenseAgentService,
   name: string,
   logger: Logger,
 ): Promise<{ success: boolean; name: string }> {

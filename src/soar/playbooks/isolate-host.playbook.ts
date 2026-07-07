@@ -1,8 +1,8 @@
 import { Logger } from '@nestjs/common';
-import type { PfSenseClientService } from '../pfsense-client.service';
+import type { IFirewallAgent } from '../agents/firewall-agent.interface';
 
 export async function isolateHostPlaybook(
-  pfsense: PfSenseClientService,
+  agent: IFirewallAgent,
   hosts: string[],
   reason: string,
   logger: Logger,
@@ -12,15 +12,13 @@ export async function isolateHostPlaybook(
 
   for (const host of hosts) {
     try {
-      const result = await pfsense.isolateHost(host, reason);
-      if (result.status === 'ok') {
+      const result = await agent.isolateHost(host, reason);
+      if (result.success) {
         isolated.push(host);
-        logger.warn(
-          `[isolate_host] Isolated ${host}: inbound=${(result.data as any)?.inboundId}, outbound=${(result.data as any)?.outboundId}`,
-        );
+        logger.warn(`[isolate_host] Isolated ${host}`);
       } else {
         failed.push(host);
-        logger.error(`[isolate_host] Failed to isolate ${host}: ${result.message}`);
+        logger.error(`[isolate_host] Failed to isolate ${host}`);
       }
     } catch (err: any) {
       failed.push(host);

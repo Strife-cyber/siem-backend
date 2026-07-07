@@ -1,6 +1,12 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PfSenseClientService } from './pfsense-client.service';
+import { FIREWALL_AGENT } from './agents/firewall-agent.interface';
+import type { IFirewallAgent } from './agents/firewall-agent.interface';
 import { blockIpPlaybook } from './playbooks/block-ip.playbook';
 import { isolateHostPlaybook } from './playbooks/isolate-host.playbook';
 import { blockPortPlaybook } from './playbooks/block-port.playbook';
@@ -10,6 +16,7 @@ import {
   deleteAliasPlaybook,
 } from './playbooks/aliases.playbook';
 import { checkIpPlaybook } from './playbooks/check-ip.playbook';
+import { PfSenseAgentService } from './agents/pfsense-agent.service';
 
 @Injectable()
 export class SoarService {
@@ -17,7 +24,7 @@ export class SoarService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly pfsense: PfSenseClientService,
+    @Inject(FIREWALL_AGENT) private readonly agent: IFirewallAgent,
   ) {}
 
   async executePlaybook(data: {
@@ -86,9 +93,9 @@ export class SoarService {
     const hosts: string[] = entities?.hosts ?? [];
     const users: string[] = entities?.users ?? [];
 
-    if (!this.pfsense.isConfigured) {
+    if (!this.agent.isConfigured) {
       this.logger.warn(
-        `[SOAR] pfSense not configured (PFSENSE_API_KEY missing) — running ${playbookName} in dry-run mode`,
+        `[SOAR] Firewall agent not configured — running ${playbookName} in dry-run mode`,
       );
     }
 
@@ -97,24 +104,24 @@ export class SoarService {
         if (ips.length === 0)
           return { skipped: true, reason: 'no IPs to block' };
         const result = await blockIpPlaybook(
-          this.pfsense,
+          this.agent,
           ips,
           'Security incident detected',
           this.logger,
         );
-        return result;
+        return result as any;
       }
 
       case 'isolate_endpoint': {
         if (hosts.length === 0)
           return { skipped: true, reason: 'no hosts to isolate' };
         const result = await isolateHostPlaybook(
-          this.pfsense,
+          this.agent,
           hosts,
           'Suspicious host detected',
           this.logger,
         );
-        return result;
+        return result as any;
       }
 
       case 'disable_account': {
@@ -131,12 +138,12 @@ export class SoarService {
         const protocol = (params?.protocol as 'tcp' | 'udp') ?? 'tcp';
         if (!targetIp) return { skipped: true, reason: 'no target IP' };
         const result = await blockPortPlaybook(
-          this.pfsense,
+          this.agent,
           [{ ip: targetIp, port, protocol }],
           (params?.reason as string) ?? 'Attack detected on port',
           this.logger,
         );
-        return result;
+        return result as any;
       }
 
       case 'temporary_block': {
@@ -144,7 +151,7 @@ export class SoarService {
         if (ips.length === 0)
           return { skipped: true, reason: 'no IPs to block' };
         const result = await temporaryBlockPlaybook(
-          this.pfsense,
+          this.agent,
           this.prisma,
           ips,
           (params?.reason as string) ?? 'Temporary block',
@@ -152,52 +159,85 @@ export class SoarService {
           incidentId,
           this.logger,
         );
-        return result;
+        return result as any;
       }
 
       case 'remove_rule': {
-        const ruleId = params?.pfSenseRuleId as string;
-        if (!ruleId) return { skipped: true, reason: 'no rule ID' };
-        const result = await this.pfsense.unblockIP(ruleId);
-        this.logger.warn(
-          `[remove_rule] Deleted rule ${ruleId}: ${result.status}`,
-        );
-        return { ruleId, status: result.status };
+        // Support both new (ip-based) and legacy (pfSenseRuleId) params
+        const ip = params?.ip as string | undefined;
+        const legacyRuleId = params?.pfSenseRuleId as string | undefined;
+
+        if (ip) {
+          // New path: unblock by IP (provider-agnostic)
+          const result = await this.agent.unblockIp(ip);
+          this.logger.warn(`[remove_rule] Unblocked IP ${ip}`);
+          return { ip, status: 'ok', ...result } as any;
+        }
+
+        if (legacyRuleId && this.agent.provider === 'pfsense') {
+          // Legacy path: delete by pfSense rule ID
+          const pfsense = this.agent as unknown as PfSenseAgentService;
+          const result = await pfsense.unblockIP_deprecated(legacyRuleId);
+          this.logger.warn(
+            `[remove_rule] Deleted legacy rule ${legacyRuleId}: ${result.status}`,
+          );
+          return { ruleId: legacyRuleId, status: result.status };
+        }
+
+        return {
+          skipped: true,
+          reason: 'no IP or rule ID provided for removal',
+        };
       }
 
       case 'create_alias': {
-        const name = (params?.name as string) ?? `siem-blocked-${Date.now()}`;
+        if (this.agent.provider !== 'pfsense') {
+          return {
+            skipped: true,
+            reason: 'Aliases require the pfSense firewall provider',
+          };
+        }
+        const name =
+          (params?.name as string) ?? `siem-blocked-${Date.now()}`;
         if (ips.length === 0) return { skipped: true, reason: 'no IPs' };
+        const pfsense = this.agent as unknown as PfSenseAgentService;
         const aliasResult = await createAliasPlaybook(
-          this.pfsense,
+          pfsense,
           name,
           ips,
           (params?.description as string) ?? 'Blocked by Smart SIEM',
           this.logger,
         );
-        return aliasResult;
+        return aliasResult as any;
       }
 
       case 'delete_alias': {
+        if (this.agent.provider !== 'pfsense') {
+          return {
+            skipped: true,
+            reason: 'Aliases require the pfSense firewall provider',
+          };
+        }
         const aliasName = params?.name as string;
         if (!aliasName) return { skipped: true, reason: 'no alias name' };
+        const pfsense = this.agent as unknown as PfSenseAgentService;
         const delResult = await deleteAliasPlaybook(
-          this.pfsense,
+          pfsense,
           aliasName,
           this.logger,
         );
-        return delResult;
+        return delResult as any;
       }
 
       case 'check_ip': {
         const checkIp = (params?.ip as string) ?? ips[0];
         if (!checkIp) return { skipped: true, reason: 'no IP to check' };
         const checkResult = await checkIpPlaybook(
-          this.pfsense,
+          this.agent,
           checkIp,
           this.logger,
         );
-        return checkResult;
+        return checkResult as any;
       }
 
       case 'notify_teams': {
@@ -230,11 +270,22 @@ export class SoarService {
     });
     if (!execution) throw new NotFoundException('Execution not found');
 
-    // If it was a temporary block, try to remove the rule from pfSense
     const payload = execution.result_payload as Record<string, unknown> | null;
-    const ruleId = payload?.pfSenseRuleId;
-    if (typeof ruleId === 'string' && this.pfsense.isConfigured) {
-      await this.pfsense.unblockIP(ruleId).catch(() => {});
+
+    // Try new format (ip-based)
+    const ip = payload?.ip as string | undefined;
+    if (typeof ip === 'string' && this.agent.isConfigured) {
+      await this.agent.unblockIp(ip).catch(() => {});
+    } else {
+      // Legacy format (pfSense-specific rule ID)
+      const legacyRuleId = payload?.pfSenseRuleId as string | undefined;
+      if (
+        typeof legacyRuleId === 'string' &&
+        this.agent.provider === 'pfsense'
+      ) {
+        const pfsense = this.agent as unknown as PfSenseAgentService;
+        await pfsense.unblockIP_deprecated(legacyRuleId).catch(() => {});
+      }
     }
 
     await this.prisma.playbookExecution.update({

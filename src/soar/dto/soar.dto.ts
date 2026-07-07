@@ -108,3 +108,11 @@ export class AbortPlaybookDto {
   @IsUUID()
   execution_id!: string;
 }
+
+// ───── Nouveaux DTOs pour les endpoints ajoutés ─────
+
+export class UnblockIpDto {
+  @ApiProperty({ description: 'IP address to unblock' })
+  @IsString()
+  ip!: string;
+}

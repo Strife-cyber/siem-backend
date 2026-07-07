@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
-import type { PfSenseClientService } from '../pfsense-client.service';
+import type { IFirewallAgent } from '../agents/firewall-agent.interface';
 import type { PrismaService } from '../../prisma/prisma.service';
 
 export async function temporaryBlockPlaybook(
-  pfsense: PfSenseClientService,
+  agent: IFirewallAgent,
   prisma: PrismaService | undefined,
   ips: string[],
   reason: string,
@@ -16,25 +16,25 @@ export async function temporaryBlockPlaybook(
 
   for (const ip of ips) {
     try {
-      const result = await pfsense.blockIP(ip, `[TEMP] ${reason}`);
-      if (result.status === 'ok') {
+      const result = await agent.blockIp(ip, `[TEMP] ${reason}`);
+      if (result.success) {
         blocked.push(ip);
-        const ruleId = (result.data as any)?.id;
+        const ruleName = result.rule_name as string | undefined;
         logger.warn(
-          `[temporary_block] Blocked ${ip} for ${ttlSeconds}s (rule: ${ruleId})`,
+          `[temporary_block] Blocked ${ip} for ${ttlSeconds}s (rule: ${ruleName ?? 'unknown'})`,
         );
 
         // Create a future playbook execution to remove the block
         if (prisma) {
-          await prisma.playbookExecution.create({
+          const cleanupExecution = await prisma.playbookExecution.create({
             data: {
               incident_id: incidentId,
               playbook_name: 'remove_rule',
               mode: 'AUTO',
               status: 'PENDING',
               result_payload: {
-                pfSenseRuleId: ruleId,
                 ip,
+                ruleName,
                 scheduledFor: new Date(
                   Date.now() + ttlSeconds * 1000,
                 ).toISOString(),
@@ -42,13 +42,13 @@ export async function temporaryBlockPlaybook(
             } as any,
           });
           logger.log(
-            `[temporary_block] Cleanup scheduled for ${new Date(Date.now() + ttlSeconds * 1000).toISOString()}`,
+            `[temporary_block] Cleanup scheduled for ${new Date(Date.now() + ttlSeconds * 1000).toISOString()} (execution: ${cleanupExecution.id})`,
           );
         }
       } else {
         failed.push(ip);
         logger.error(
-          `[temporary_block] Failed to block ${ip}: ${result.message}`,
+          `[temporary_block] Failed to block ${ip}: provider returned error`,
         );
       }
     } catch (err: any) {

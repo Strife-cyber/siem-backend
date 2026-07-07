@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type { PfSenseClientService } from '../pfsense-client.service';
+import type { IFirewallAgent } from '../agents/firewall-agent.interface';
 
 export interface PortBlockTarget {
   ip: string;
@@ -8,7 +8,7 @@ export interface PortBlockTarget {
 }
 
 export async function blockPortPlaybook(
-  pfsense: PfSenseClientService,
+  agent: IFirewallAgent,
   targets: PortBlockTarget[],
   reason: string,
   logger: Logger,
@@ -18,13 +18,13 @@ export async function blockPortPlaybook(
 
   for (const target of targets) {
     try {
-      const result = await pfsense.blockPort(
+      const result = await agent.blockPort(
         target.ip,
         target.port,
         target.protocol,
         reason,
       );
-      if (result.status === 'ok') {
+      if (result.success) {
         blocked.push(target);
         logger.warn(
           `[block_port] Blocked ${target.ip}:${target.port}/${target.protocol}: ${reason}`,
@@ -32,7 +32,7 @@ export async function blockPortPlaybook(
       } else {
         failed.push(target);
         logger.error(
-          `[block_port] Failed to block ${target.ip}:${target.port}: ${result.message}`,
+          `[block_port] Failed to block ${target.ip}:${target.port}`,
         );
       }
     } catch (err: any) {
