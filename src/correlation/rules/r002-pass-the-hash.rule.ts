@@ -24,6 +24,8 @@ export class PassTheHashRule implements DetectionRule {
     source_types: ['windows', 'windows_security', 'active_directory'],
     actions: ['login', 'authenticate', 'user_login', 'successful_login'],
     outcomes: ['success'],
+    trigger_playbook: 'isolate_endpoint',
+    playbook_mode: 'CONFIRM',
     params: {
       baseline_redis_key: 'pth:baseline',
     },

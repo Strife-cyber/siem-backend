@@ -150,6 +150,25 @@ export class SoarController {
   }
 
   // ══════════════════════════════════════════════════
+  //  CONFIRM mode — analyst approval
+  // ══════════════════════════════════════════════════
+
+  @Get('pending')
+  @ApiOperation({
+    summary: 'List all playbook executions pending analyst approval (CONFIRM mode)',
+  })
+  async getPendingExecutions() {
+    return this.soarService.getPendingExecutions();
+  }
+
+  @Post('approve/:executionId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve a CONFIRM-mode playbook execution' })
+  async approveExecution(@Param('executionId') executionId: string) {
+    return this.soarService.approveExecution(executionId);
+  }
+
+  // ══════════════════════════════════════════════════
   //  Direct firewall actions (pfSense-specific)
   // ══════════════════════════════════════════════════
 

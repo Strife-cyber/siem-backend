@@ -47,6 +47,15 @@ export class SoarService {
       } as any,
     });
 
+    // ── CONFIRM mode: pause and wait for analyst approval ──
+    if (data.mode === 'CONFIRM') {
+      this.logger.warn(
+        `[SOAR] ${data.playbook_name} PENDING analyst approval (execution: ${execution.id})`,
+      );
+      return { execution_id: execution.id, status: 'PENDING', mode: 'CONFIRM' };
+    }
+
+    // ── AUTO mode: execute immediately ──
     let resultPayload: Record<string, unknown> = {};
 
     try {
@@ -293,5 +302,80 @@ export class SoarService {
       data: { status: 'ABORTED' },
     });
     return { status: 'aborted' };
+  }
+
+  // ══════════════════════════════════════════════════
+  //  CONFIRM mode — analyst approval workflow
+  // ══════════════════════════════════════════════════
+
+  /** List all PENDING playbook executions awaiting analyst approval */
+  async getPendingExecutions() {
+    return this.prisma.playbookExecution.findMany({
+      where: { status: 'PENDING', mode: 'CONFIRM' },
+      include: {
+        incident: { select: { id: true, severity: true, summary: true, triggered_at: true } },
+      },
+      orderBy: { initiated_at: 'desc' },
+    });
+  }
+
+  /**
+   * Approve a pending CONFIRM-mode execution and run the playbook.
+   * Rejects with 404 if not found, 400 if not in PENDING/CONFIRM state.
+   */
+  async approveExecution(executionId: string) {
+    const execution = await this.prisma.playbookExecution.findUnique({
+      where: { id: executionId },
+    });
+    if (!execution) throw new NotFoundException('Execution not found');
+    if (execution.status !== 'PENDING') {
+      throw new NotFoundException(
+        `Execution ${executionId} is ${execution.status}, not PENDING`,
+      );
+    }
+    if (execution.mode !== 'CONFIRM') {
+      throw new NotFoundException(
+        `Execution ${executionId} is in ${execution.mode} mode, not CONFIRM`,
+      );
+    }
+
+    const payload = execution.result_payload as Record<string, unknown> | undefined;
+
+    let resultPayload: Record<string, unknown> = {};
+
+    try {
+      resultPayload = await this.runPlaybook(
+        execution.playbook_name,
+        execution.incident_id,
+        payload?.params as Record<string, unknown> | undefined,
+      );
+
+      await this.prisma.playbookExecution.update({
+        where: { id: executionId },
+        data: {
+          status: 'EXECUTED',
+          executed_at: new Date(),
+          result_payload: resultPayload as any,
+        },
+      });
+
+      this.logger.warn(
+        `[SOAR] CONFIRM approved — ${execution.playbook_name} executed (${executionId})`,
+      );
+    } catch (err: any) {
+      await this.prisma.playbookExecution.update({
+        where: { id: executionId },
+        data: {
+          status: 'FAILED',
+          executed_at: new Date(),
+          result_payload: { error: err.message } as any,
+        },
+      });
+      this.logger.error(
+        `[SOAR] CONFIRM approved — ${execution.playbook_name} FAILED: ${err.message}`,
+      );
+    }
+
+    return { execution_id: executionId, status: 'EXECUTED' };
   }
 }

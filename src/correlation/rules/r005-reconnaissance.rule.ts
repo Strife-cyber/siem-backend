@@ -30,6 +30,8 @@ export class ReconnaissanceRule implements DetectionRule {
     ],
     actions: ['network_connect', 'network_flow', 'http_request'],
     outcomes: ['success', 'failure'],
+    trigger_playbook: 'temporary_block',
+    playbook_mode: 'AUTO',
   };
 
   async detect(

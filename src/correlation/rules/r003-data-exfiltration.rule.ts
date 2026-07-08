@@ -29,6 +29,8 @@ export class DataExfilRule implements DetectionRule {
       'linux_network',
       'linux',
     ],
+    trigger_playbook: 'block_port',
+    playbook_mode: 'AUTO',
     params: {
       multiplier_threshold: 10,
       min_volume_mb: 10,

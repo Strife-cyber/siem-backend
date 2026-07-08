@@ -35,6 +35,8 @@ export class BruteForceRule implements DetectionRule {
       'auth_event',
     ],
     outcomes: ['failure'],
+    trigger_playbook: 'block_ip',
+    playbook_mode: 'AUTO',
   };
 
   async detect(
