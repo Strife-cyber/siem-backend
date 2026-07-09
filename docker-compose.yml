@@ -65,6 +65,36 @@ services:
     networks:
       - siem-network
 
+  frontend:
+    image: cloudx02/siem-frontend:0.0.5
+    container_name: siem-frontend
+    environment:
+      VITE_API_URL: http://localhost
+      VITE_WS_URL: http://localhost
+      VITE_USE_DEMO_DATA: "false"
+    ports:
+      - '5173:3001'
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - siem-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: siem-caddy
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - frontend
+      - app
+    networks:
+      - siem-network
+
   app:
     build:
       context: .
@@ -79,8 +109,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      JWT_SECRET: change-this-to-a-secure-random-string-in-production
-      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,https://api.siem.strife-cyber.org
+      JWT_SECRET: ctu-siem-jwt-secret-2026-change-in-production
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://localhost:3000,https://strife-cyber.taild0a5b5.ts.net,https://api.siem.strife-cyber.org
       SOAR_FIREWALL_PROVIDER: pfsense
       PFSENSE_URL: http://172.24.32.1:8080
       PFSENSE_API_KEY: 0ee670fbb746a2de16bae58c3775d088
@@ -92,7 +122,7 @@ services:
       SMTP_PASS: fkjt myap dzjk hnhi
       SMTP_FROM_NAME: 'Smart SIEM CTU'
       ALERT_EMAIL_TO: dunamisjunior15@gmail.com
-      SIEM_DASHBOARD_URL: https://api.siem.strife-cyber.org
+      SIEM_DASHBOARD_URL: https://strife-cyber.taild0a5b5.ts.net
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,6 +139,8 @@ volumes:
   redis_data:
     driver: local
   elasticsearch_data:
+    driver: local
+  caddy_data:
     driver: local
 
 networks:
