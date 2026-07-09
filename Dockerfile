@@ -29,12 +29,12 @@ COPY --from=builder /usr/src/app/prisma ./prisma
 COPY templates ./templates
 RUN mkdir -p /usr/src/app/reports/pdf /usr/src/app/reports/xlsx /usr/src/app/reports/csv
 
-# Create config and verify it exists
-# Minimal Prisma config — no datasource block to avoid the hang in npx commands
+# Prisma 7.x requires config for datasource URL (no longer in schema)
+# Must reconstruct since the source config uses PrismaClient adapter pattern
 RUN echo 'import { defineConfig } from "prisma/config";' > /usr/src/app/prisma.config.ts && \
     echo 'export default defineConfig({' >> /usr/src/app/prisma.config.ts && \
     echo '  schema: "prisma/schema.prisma",' >> /usr/src/app/prisma.config.ts && \
-    echo '  migrations: { path: "prisma/migrations" },' >> /usr/src/app/prisma.config.ts && \
+    echo '  datasource: { url: process.env.DATABASE_URL },' >> /usr/src/app/prisma.config.ts && \
     echo '});' >> /usr/src/app/prisma.config.ts
 
 # Patch Prisma client to remove import.meta.url (not valid in CJS)
@@ -54,7 +54,7 @@ RUN echo '#!/bin/sh' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'echo "Dist dir exists: $([ -d /usr/src/app/dist ] && echo YES || echo NO)"' >> /usr/local/bin/docker-entrypoint.sh && \
     echo '' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'echo "=== Running Prisma migrations ==="' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo 'timeout 20 sh -c "npx prisma migrate deploy 2>&1" || echo "[WARN] Prisma migration timed out, continuing..."' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'npx prisma db push --accept-data-loss 2>&1 || echo "[WARN] Prisma db push failed, continuing..."' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'echo "=== Migrations applied ==="' >> /usr/local/bin/docker-entrypoint.sh && \
     echo '' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'echo "=== Starting application ==="' >> /usr/local/bin/docker-entrypoint.sh && \

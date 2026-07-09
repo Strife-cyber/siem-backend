@@ -45,6 +45,16 @@ export class BruteForceRule implements DetectionRule {
   ): Promise<DetectionResult[]> {
     const now = new Date();
 
+    const filters: any[] = [
+      { terms: { source_type: this.definition.source_types! } },
+      { terms: { action: this.definition.actions! } },
+    ];
+
+    // Only add outcome filter if outcomes are defined (some beat types don't populate it)
+    if (this.definition.outcomes?.length) {
+      filters.push({ terms: { outcome: this.definition.outcomes } });
+    }
+
     const result = await es
       .getClient()
       .search({
@@ -53,9 +63,7 @@ export class BruteForceRule implements DetectionRule {
         query: {
           bool: {
             filter: [
-              { terms: { source_type: this.definition.source_types! } },
-              { terms: { action: this.definition.actions! } },
-              { terms: { outcome: this.definition.outcomes! } },
+              ...filters,
               {
                 range: {
                   collected_at: {
