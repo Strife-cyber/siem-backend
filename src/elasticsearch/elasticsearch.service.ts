@@ -209,11 +209,11 @@ export class ElasticsearchService implements OnModuleInit {
     }
 
     const body = logs.flatMap((log) => [
-      { index: { _index: LOGS_ALIAS, _id: log.ingestion_hash } },
+      { index: { _index: LOGS_ALIAS } },
       log,
     ]);
 
-    const response = await this.client.bulk({ body, refresh: 'wait_for' });
+    const response = await this.client.bulk({ body });
 
     if (response.errors) {
       const errorItems = response.items.filter((item) => item.index?.error);

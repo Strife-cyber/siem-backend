@@ -9,6 +9,10 @@ interface UebaScoringJob {
   log: NormalizedLog;
 }
 
+interface UebaBatchJob {
+  logs: NormalizedLog[];
+}
+
 interface UebaBaselineJob {
   // empty — triggers a full rebuild
 }
@@ -24,11 +28,18 @@ export class UebaProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<UebaScoringJob | UebaBaselineJob>): Promise<void> {
+  async process(job: Job<UebaScoringJob | UebaBatchJob | UebaBaselineJob>): Promise<void> {
     switch (job.name) {
       case 'score': {
         const { log } = job.data as UebaScoringJob;
         return this.handleScoring(log);
+      }
+      case 'score-batch': {
+        const { logs } = job.data as UebaBatchJob;
+        for (const log of logs) {
+          await this.handleScoring(log).catch(() => {});
+        }
+        return;
       }
       case 'rebuild-baselines': {
         return this.handleRebuildBaselines();

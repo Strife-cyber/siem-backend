@@ -119,10 +119,32 @@ model Incident {
   assigned_user   User?            @relation("assigned_incidents", fields: [assigned_to], references: [id], onDelete: SetNull)
   batch_manifest  BatchManifest?   @relation(fields: [batch_manifest_id], references: [id])
   playbook_executions PlaybookExecution[]
+  incident_events     IncidentEvent[]
 
   @@index([severity, status], name: "idx_incidents_severity_status")
   @@index([triggered_at], name: "idx_incidents_triggered_at")
   @@map("incidents")
+}
+
+model IncidentEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  incident_id     String   @db.Uuid
+  es_id           String?  @db.VarChar(255)
+  collected_at    DateTime @db.Timestamptz()
+  source_ip       String?  @db.VarChar(45)
+  destination_ip  String?  @db.VarChar(45)
+  hostname        String?  @db.VarChar(255)
+  user_principal  String?  @db.VarChar(255)
+  action          String?  @db.VarChar(255)
+  outcome         String?  @db.VarChar(50)
+  source_type     String?  @db.VarChar(50)
+  raw_message     String?  @db.Text
+  event_snapshot  Json?
+
+  incident Incident @relation(fields: [incident_id], references: [id], onDelete: Cascade)
+
+  @@index([incident_id])
+  @@map("incident_events")
 }
 
 model PlaybookExecution {

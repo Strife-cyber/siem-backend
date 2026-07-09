@@ -62,6 +62,8 @@ export function parseWindowsSecurity(
       if (m) user = m[1];
     }
     enriched.target_user = user;
+    // Also set user_principal so correlation can count distinct accounts
+    enriched.user_principal = user;
 
     // Failure Reason
     let reason = xmlField(raw, 'FailureReason');

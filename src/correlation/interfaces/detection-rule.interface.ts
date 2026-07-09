@@ -2,6 +2,24 @@ import type { ElasticsearchService } from '../../elasticsearch/elasticsearch.ser
 import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
+ * A snapshot of an individual event that contributed to a detection.
+ * Key fields are stored so analysts can see the evidence that triggered the incident.
+ */
+export interface IncidentEventPayload {
+  es_id?: string;
+  collected_at: string;
+  source_ip?: string;
+  destination_ip?: string;
+  hostname?: string;
+  user_principal?: string;
+  action?: string;
+  outcome?: string;
+  source_type?: string;
+  raw_message?: string;
+  [key: string]: unknown;
+}
+
+/**
  * A detection result produced by a rule when its threshold is exceeded.
  */
 export interface DetectionResult {
@@ -15,6 +33,11 @@ export interface DetectionResult {
     users?: string[];
     hosts?: string[];
   };
+  /**
+   * Individual log events from Elasticsearch that caused this detection.
+   * Stored as incident_events so analysts can review the raw evidence.
+   */
+  matching_events?: IncidentEventPayload[];
 }
 
 /**

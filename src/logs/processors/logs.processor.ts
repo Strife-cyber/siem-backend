@@ -8,7 +8,7 @@ import type { CreateLogDto } from '../dto/create-log.dto';
 import { enrichLog } from '../enrichers/enricher.registry';
 import { LogsRetentionService } from '../logs-retention.service';
 
-@Processor('logs', { concurrency: 10 })
+@Processor('logs', { concurrency: 50 })
 export class LogsProcessor extends WorkerHost {
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
@@ -32,15 +32,12 @@ export class LogsProcessor extends WorkerHost {
         }));
         await this.elasticsearchService.bulkInsert(enriched);
 
-        // Push each normalized log to UEBA for behavioral scoring
-        for (const log of normalized) {
-          if (log.user_principal) {
-            await this.uebaQueue
-              .add('score', { log }, { attempts: 3 })
-              .catch(() => {
-                // Non-critical: UEBA scoring is best-effort
-              });
-          }
+        // Batch UEBA scoring — single queue job per batch instead of per-log
+        const scoredLogs = normalized.filter((l) => l.user_principal);
+        if (scoredLogs.length > 0) {
+          await this.uebaQueue
+            .add('score-batch', { logs: scoredLogs }, { attempts: 2 })
+            .catch(() => {});
         }
         break;
       }

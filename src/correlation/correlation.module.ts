@@ -13,6 +13,15 @@ import { SoarModule } from '../soar/soar.module';
     BullModule.registerQueue({
       name: 'notifications',
     }),
+    BullModule.registerQueue({
+      name: 'logs',
+    }),
+    BullModule.registerQueue({
+      name: 'ueba',
+    }),
+    BullModule.registerQueue({
+      name: 'reports',
+    }),
     SoarModule,
   ],
   providers: [CorrelationService, CorrelationScheduler],

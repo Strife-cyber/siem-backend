@@ -9,7 +9,10 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     const { method, originalUrl } = req;
 
     // Skip log ingestion spam and health checks
-    if (method === 'HEAD' || (method === 'POST' && originalUrl === '/api/v1/logs')) {
+    if (
+      method === 'HEAD' ||
+      (method === 'POST' && originalUrl === '/api/v1/logs')
+    ) {
       return next();
     }
 
@@ -19,7 +22,8 @@ export class RequestLoggerMiddleware implements NestMiddleware {
       const duration = Date.now() - start;
       const statusCode = res.statusCode;
 
-      const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'log';
+      const level =
+        statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'log';
       this.logger[level](
         `${method} ${originalUrl} ${statusCode} ${duration}ms`,
       );

@@ -17,7 +17,7 @@ export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
   private readonly pendingJobs = new Map<
     string,
-    { status: string; meta?: ReportMeta }
+    { status: string; meta?: ReportMeta; error?: string }
   >();
 
   constructor(
@@ -37,7 +37,7 @@ export class ReportsService {
     // Fire and forget — generate in background
     this.doGenerate(jobId, request).catch((err) => {
       this.logger.error(`Report generation failed: ${err.message}`);
-      this.pendingJobs.set(jobId, { status: 'failed' });
+      this.pendingJobs.set(jobId, { status: 'failed', error: err.message ?? String(err) });
     });
 
     return { job_id: jobId, status: 'generating' };
@@ -100,12 +100,13 @@ export class ReportsService {
         );
       }
     } catch (err: any) {
-      this.pendingJobs.set(jobId, { status: 'failed' });
+      const msg = err.message ?? String(err);
+      this.pendingJobs.set(jobId, { status: 'failed', error: msg });
       throw err;
     }
   }
 
-  getJobStatus(jobId: string): { status: string; meta?: ReportMeta } | null {
+  getJobStatus(jobId: string): { status: string; meta?: ReportMeta; error?: string } | null {
     return this.pendingJobs.get(jobId) ?? null;
   }
 
