@@ -46,7 +46,6 @@ export class LogsService {
       sort_field: query.sort_field,
       sort_order: query.sort_order,
     };
-
     return this.elasticsearchService.search(esQuery);
   }
 }

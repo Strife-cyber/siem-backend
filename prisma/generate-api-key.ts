@@ -18,7 +18,6 @@ async function main() {
   });
 
   await prisma.$disconnect();
-
   console.log('');
   console.log('╔══════════════════════════════════════════════════╗');
   console.log('║        NEW API KEY GENERATED                    ║');

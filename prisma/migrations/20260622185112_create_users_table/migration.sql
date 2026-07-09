@@ -12,6 +12,7 @@ CREATE TABLE "User" (
     "updated_at" TIMESTAMP(3) NOT NULL,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
 
+    
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
