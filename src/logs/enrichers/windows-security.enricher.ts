@@ -37,7 +37,10 @@ export function parseWindowsSecurity(
   const enriched: Partial<EnrichedLog> = {};
 
   // Extract Event ID (works for both XML and legacy formats)
-  const eventIdMatch = raw.match(/Event\s+(\d+)/i);
+  let eventIdMatch = raw.match(/EventID>(\d+)<\/EventID>/i);
+  if (!eventIdMatch) {
+    eventIdMatch = raw.match(/Event\s+(\d+)/i);
+  }
   if (eventIdMatch) {
     enriched.event_id = parseInt(eventIdMatch[1], 10);
   }

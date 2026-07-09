@@ -18,13 +18,14 @@ export class BruteForceRule implements DetectionRule {
     time_window_seconds: 60,
     interval_seconds: 60,
     threshold: 5,
-    max_time_span_seconds: 45,
+    max_time_span_seconds: 120,
     source_types: [
       'linux',
       'linux_auth',
       'linux_syslog',
       'windows',
       'windows_security',
+      'windows_application',
       'active_directory',
     ],
     actions: [
@@ -34,7 +35,7 @@ export class BruteForceRule implements DetectionRule {
       'auth_failure',
       'auth_event',
     ],
-    outcomes: ['failure'],
+    outcomes: [],
     trigger_playbook: 'block_ip',
     playbook_mode: 'AUTO',
   };
@@ -66,7 +67,7 @@ export class BruteForceRule implements DetectionRule {
               ...filters,
               {
                 range: {
-                  collected_at: {
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },

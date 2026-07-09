@@ -8,13 +8,19 @@
     <p style="color: #475569; margin-top: 8px;">{{summary}}</p>
   </div>
 
+  {{#if ips}}
+  <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+    <span style="font-size: 13px; color: #64748b;">Attacker IP</span>
+    <div style="font-size: 18px; font-weight: bold; font-family: monospace; color: {{color}};">{{join ips ", "}}</div>
+  </div>
+  {{/if}}
+
   <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
     <tr><td style="padding: 8px; color: #64748b;">Rule</td><td style="padding: 8px; font-weight: bold;">{{rule_id}} — {{rule_name}}</td></tr>
+    {{#if hosts}}<tr style="background: #f8fafc;"><td style="padding: 8px; color: #64748b;">Target Hosts</td><td style="padding: 8px; font-weight: bold; font-family: monospace;">{{join hosts ", "}}</td></tr>{{/if}}
+    {{#if users}}<tr><td style="padding: 8px; color: #64748b;">Target Users</td><td style="padding: 8px; font-weight: bold; font-family: monospace;">{{join users ", "}}</td></tr>{{/if}}
     <tr style="background: #f8fafc;"><td style="padding: 8px; color: #64748b;">Confidence</td><td style="padding: 8px; font-weight: bold;">{{confidence_score}}/100</td></tr>
-    <tr><td style="padding: 8px; color: #64748b;">Time</td><td style="padding: 8px; font-weight: bold;">{{triggered_at}}</td></tr>
-    {{#if ips}}<tr style="background: #f8fafc;"><td style="padding: 8px; color: #64748b;">IPs</td><td style="padding: 8px; font-weight: bold; font-family: monospace;">{{join ips ", "}}</td></tr>{{/if}}
-    {{#if hosts}}<tr><td style="padding: 8px; color: #64748b;">Hosts</td><td style="padding: 8px; font-weight: bold;">{{join hosts ", "}}</td></tr>{{/if}}
-    {{#if users}}<tr style="background: #f8fafc;"><td style="padding: 8px; color: #64748b;">Users</td><td style="padding: 8px; font-weight: bold;">{{join users ", "}}</td></tr>{{/if}}
+    <tr><td style="padding: 8px; color: #64748b;">Detected At</td><td style="padding: 8px; font-weight: bold;">{{time_str}}</td></tr>
   </table>
 
   <a href="{{dashboard_url}}/incidents/{{id}}" style="display: inline-block; margin-top: 24px; background: {{color}}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View in SIEM</a>

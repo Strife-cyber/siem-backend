@@ -1,3 +1,4 @@
+
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type Mail from 'nodemailer/lib/mailer';
@@ -99,6 +100,45 @@ export class MailService {
     }
   }
 
+  async sendEmailWithAttachment(options: {
+    to: string | string[];
+    subject: string;
+    html: string;
+    text?: string;
+    attachment: { filename: string; content?: Buffer; path?: string };
+  }): Promise<boolean> {
+    if (!this.transporter) {
+      this.logger.log(
+        `[Mail] [DRY-RUN] To: ${options.to} | Subject: ${options.subject} | Attachment: ${options.attachment.filename}`,
+      );
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
+        subject: options.subject,
+        html: options.html,
+        attachments: [
+          {
+            filename: options.attachment.filename,
+            content: options.attachment.content,
+          },
+        ],
+      });
+      this.logger.log(
+        `[Mail] Sent to ${options.to}: "${options.subject}" (attachment: ${options.attachment.filename})`,
+      );
+      return true;
+    } catch (err: any) {
+      this.logger.error(
+        `[Mail] Failed to send to ${options.to}: ${err.message}`,
+      );
+      return false;
+    }
+  }
+
   async sendMfaCode(
     email: string,
     code: string,
@@ -138,11 +178,23 @@ export class MailService {
     const dashboardUrl =
       process.env.SIEM_DASHBOARD_URL || 'http://localhost:5173';
 
+    // Format time nicely
+    const timeStr = incident.triggered_at.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      timeZoneName: 'short',
+    });
+
+    // Attacker info for subject line
+    const attackerIp = incident.ips?.[0] ?? '';
+    const targetHosts = incident.hosts?.join(', ') ?? '';
+
     const template = this.templates.get('incident-alert');
     const html = template
       ? template({
           ...incident,
           color,
+          time_str: timeStr,
           dashboard_url: dashboardUrl,
           join: (arr: string[], sep: string) => arr.join(sep),
         })
@@ -159,63 +211,17 @@ export class MailService {
       return false;
     }
 
+    // Build subject: include attacker IP and target if available
+    let subject = `[SIEM] ${incident.severity}`;
+    if (attackerIp) subject += ` from ${attackerIp}`;
+    if (targetHosts) subject += ` → ${targetHosts}`;
+    subject += ` — ${incident.summary?.slice(0, 60) || 'Security Alert'}`;
+
     return this.sendEmail({
       to: recipients,
-      subject: `[SIEM] ${incident.severity} — ${incident.summary?.slice(0, 80) || 'Security Alert'}`,
+      subject: subject.slice(0, 120),
       html,
     });
-  }
-
-  /**
-   * Send an email with a file attachment (typically a PDF report).
-   * The attachment is read from disk and embedded in the message.
-   */
-  async sendEmailWithAttachment(options: {
-    to: string | string[];
-    subject: string;
-    html: string;
-    attachment: { filename: string; path: string };
-    text?: string;
-  }): Promise<boolean> {
-    if (!this.transporter) {
-      this.logger.log(
-        `[Mail] [DRY-RUN] To: ${options.to} | Subject: ${options.subject} | Attachment: ${options.attachment.filename}`,
-      );
-      return true;
-    }
-
-    try {
-      // Verify the attachment exists before sending
-      if (!fs.existsSync(options.attachment.path)) {
-        this.logger.error(
-          `[Mail] Attachment not found: ${options.attachment.path}`,
-        );
-        return false;
-      }
-
-      await this.transporter.sendMail({
-        from: this.from,
-        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text,
-        attachments: [
-          {
-            filename: options.attachment.filename,
-            path: options.attachment.path,
-          },
-        ],
-      });
-      this.logger.log(
-        `[Mail] Sent with attachment to ${options.to}: "${options.subject}" (${options.attachment.filename})`,
-      );
-      return true;
-    } catch (err: any) {
-      this.logger.error(
-        `[Mail] Failed to send with attachment to ${options.to}: ${err.message}`,
-      );
-      return false;
-    }
   }
 
   async sendDailyDigest(data: {

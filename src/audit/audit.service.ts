@@ -20,6 +20,10 @@ export class AuditService {
    */
   async log(entry: AuditLogEntry): Promise<void> {
     try {
+      // Skip audit if user_id is not a valid UUID (e.g. "unknown" for failed logins)
+      const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entry.userId);
+      if (!isValidUuid) return;
+
       await this.prisma.auditTrail.create({
         data: {
           user_id: entry.userId,

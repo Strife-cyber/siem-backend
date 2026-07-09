@@ -32,6 +32,7 @@ const enricherRegistry: Record<string, EnricherFn> = {
   linux_systemd_journal: parseLinuxGeneric,
   app: parseLinuxGeneric,
   active_directory: parseWindowsSecurity,
+  windows_application: parseWindowsSecurity,
   traefik: parseFirewall,
 };
 

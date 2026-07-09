@@ -151,7 +151,7 @@ export class CorrelationService {
                       : []),
                     {
                       range: {
-                        collected_at: {
+                        normalized_at: {
                           gte: new Date(
                             Date.now() -
                               rule.definition.time_window_seconds * 1000,

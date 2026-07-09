@@ -6,8 +6,14 @@ export class RequestLoggerMiddleware implements NestMiddleware {
   private readonly logger = new Logger('HTTP');
 
   use(req: Request, res: Response, next: NextFunction): void {
-    const start = Date.now();
     const { method, originalUrl } = req;
+
+    // Skip log ingestion spam and health checks
+    if (method === 'HEAD' || (method === 'POST' && originalUrl === '/api/v1/logs')) {
+      return next();
+    }
+
+    const start = Date.now();
 
     res.on('finish', () => {
       const duration = Date.now() - start;

@@ -1,5 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+
+// BigInt is not serializable by JSON.stringify by default
+if (typeof BigInt !== 'undefined') {
+  (BigInt.prototype as any).toJSON = function () {
+    return this.toString();
+  };
+}
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
