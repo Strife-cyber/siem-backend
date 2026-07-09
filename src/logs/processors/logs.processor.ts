@@ -6,12 +6,14 @@ import { ElasticsearchService } from '../../elasticsearch/elasticsearch.service'
 import type { NormalizedLog } from '../interfaces/normalized-log.interface';
 import type { CreateLogDto } from '../dto/create-log.dto';
 import { enrichLog } from '../enrichers/enricher.registry';
+import { LogsRetentionService } from '../logs-retention.service';
 
 @Processor('logs', { concurrency: 10 })
 export class LogsProcessor extends WorkerHost {
   constructor(
     private readonly elasticsearchService: ElasticsearchService,
     @InjectQueue('ueba') private readonly uebaQueue: Queue,
+    private readonly retentionService: LogsRetentionService,
   ) {
     super();
   }
@@ -40,6 +42,10 @@ export class LogsProcessor extends WorkerHost {
               });
           }
         }
+        break;
+      }
+      case 'retention-archive': {
+        await this.retentionService.archiveAndPurge(30);
         break;
       }
     }
