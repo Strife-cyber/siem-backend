@@ -123,6 +123,20 @@ export class WindowsDefenderAgentClientService implements IFirewallAgent {
   }
 
   // ══════════════════════════════════════════════════
+  //  unIsolateHost
+  // ══════════════════════════════════════════════════
+
+  async unIsolateHost(
+    ip: string,
+    reason?: string,
+  ): Promise<FirewallActionResponse> {
+    return this.post<FirewallActionResponse>('/firewall/unisolate', {
+      ip,
+      reason: reason ?? 'Removed from isolation by Smart SIEM',
+    });
+  }
+
+  // ══════════════════════════════════════════════════
   //  checkIp
   // ══════════════════════════════════════════════════
 

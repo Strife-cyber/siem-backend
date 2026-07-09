@@ -97,6 +97,9 @@ export interface IFirewallAgent {
   /** Lever tous les blocages associés à une IP */
   unblockIp(ip: string): Promise<FirewallActionResponse>;
 
+  /** Retirer un hôte de l'isolation */
+  unIsolateHost(ip: string, reason?: string): Promise<FirewallActionResponse>;
+
   /** Lister toutes les règles gérées par Smart SIEM */
   listRules(): Promise<FirewallActionResponse>;
 

@@ -82,7 +82,7 @@ services:
       JWT_SECRET: change-this-to-a-secure-random-string-in-production
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,https://api.siem.strife-cyber.org
       SOAR_FIREWALL_PROVIDER: pfsense
-      PFSENSE_URL: http://192.168.37.135
+      PFSENSE_URL: http://172.24.32.1:8080
       PFSENSE_API_KEY: 0ee670fbb746a2de16bae58c3775d088
       PFSENSE_TIMEOUT: '10000'
       PFSENSE_REJECT_UNAUTHORIZED: 'false'

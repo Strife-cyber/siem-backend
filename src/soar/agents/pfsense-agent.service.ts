@@ -38,6 +38,7 @@ export interface PfSenseAlias {
   name: string;
   type: 'host' | 'network' | 'port';
   addresses: string[];
+  detail?: string[];
   descr: string;
 }
 
@@ -84,8 +85,12 @@ export class PfSenseAgentService implements IFirewallAgent {
   }
 
   // ══════════════════════════════════════════════════
-  //  IFirewallAgent — blockIp
+  //  IFirewallAgent — blockIp (uses Smart_Siem_Blocklist alias)
   // ══════════════════════════════════════════════════
+
+  /** Alias names on pfSense */
+  private readonly BLOCKLIST_ALIAS = 'Smart_Siem_Blocklist';
+  private readonly ISOLATION_ALIAS = 'Smart_Siem_Isolation';
 
   async blockIp(
     ip: string,
@@ -94,40 +99,90 @@ export class PfSenseAgentService implements IFirewallAgent {
   ): Promise<FirewallActionResponse> {
     const validation = validateBlockIp(ip);
     if (!validation.valid) throw new Error(validation.error);
-
-    const ruleName = `SmartSIEM-Block-${ip}`;
     const effectiveReason = reason ?? 'Blocked by Smart SIEM';
 
     return this.write(async () => {
-      const result = await this.post('/api/v2/firewall/rule', {
-        type: 'block',
-        interface: ['wan'],
-        ipprotocol: 'inet',
-        source: ip,
-        destination: 'any',
-        descr: `${ruleName} - ${effectiveReason}`,
-        disabled: false,
-        log: true,
-      });
-
-      if (result.status === 'ok') {
-        await this.applyChanges();
-      }
-
-      return this.buildResponse(result.status === 'ok', {
+      await this.addIpToAlias(this.BLOCKLIST_ALIAS, ip, effectiveReason);
+      return this.buildResponse(true, {
         action_requested: 'block_ip',
-        action_applied: result.status === 'ok' ? 'block_ip' : 'none',
+        action_applied: 'block_ip',
         scope: 'network_gateway_inbound',
-        effect: `Traffic from ${ip} to any destination blocked at gateway.`,
-        limitations: [
-          'Block applies at network gateway level (all hosts behind pfSense).',
-          'Does not affect traffic that bypasses the gateway.',
-        ],
+        effect: `IP ${ip} added to ${this.BLOCKLIST_ALIAS}. Traffic blocked at WAN.`,
+        limitations: ['Block applies at network gateway level via alias.'],
         audit: { ...(audit ?? {}) },
         ip,
-        rule_name: ruleName,
         reason: effectiveReason,
-        pfSenseRuleId: (result.data as any)?.id,
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════
+  //  IFirewallAgent — unblockIp (removes from Smart_Siem_Blocklist alias)
+  // ══════════════════════════════════════════════════
+
+  async unblockIp(
+    ip: string,
+    reason?: string,
+  ): Promise<FirewallActionResponse> {
+    const effectiveReason = reason ?? 'Unblocked by Smart SIEM';
+    return this.write(async () => {
+      await this.removeIpFromAlias(this.BLOCKLIST_ALIAS, ip);
+      return this.buildResponse(true, {
+        action_requested: 'unblock_ip',
+        action_applied: 'unblock_ip',
+        scope: 'network_gateway_inbound',
+        effect: `IP ${ip} removed from ${this.BLOCKLIST_ALIAS}. Traffic allowed.`,
+        limitations: [],
+        ip,
+        reason: effectiveReason,
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════
+  //  IFirewallAgent — isolateHost (adds to Smart_Siem_Isolation alias)
+  // ══════════════════════════════════════════════════
+
+  async isolateHost(
+    ip: string,
+    reason?: string,
+    audit?: FirewallAuditMeta,
+  ): Promise<FirewallActionResponse> {
+    const effectiveReason = reason ?? 'Isolated by Smart SIEM';
+    return this.write(async () => {
+      await this.addIpToAlias(this.ISOLATION_ALIAS, ip, effectiveReason);
+      return this.buildResponse(true, {
+        action_requested: 'isolate_host',
+        action_applied: 'isolate_host',
+        scope: 'lan_host_isolation',
+        effect: `Host ${ip} added to ${this.ISOLATION_ALIAS}. LAN traffic blocked.`,
+        limitations: ['Isolation applies at LAN level via alias.'],
+        audit: { ...(audit ?? {}) },
+        ip,
+        reason: effectiveReason,
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════
+  //  IFirewallAgent — unIsolateHost
+  // ══════════════════════════════════════════════════
+
+  async unIsolateHost(
+    ip: string,
+    reason?: string,
+  ): Promise<FirewallActionResponse> {
+    const effectiveReason = reason ?? 'Removed from isolation by Smart SIEM';
+    return this.write(async () => {
+      await this.removeIpFromAlias(this.ISOLATION_ALIAS, ip);
+      return this.buildResponse(true, {
+        action_requested: 'unisolate_host',
+        action_applied: 'unisolate_host',
+        scope: 'lan_host_isolation',
+        effect: `Host ${ip} removed from ${this.ISOLATION_ALIAS}. LAN traffic allowed.`,
+        limitations: [],
+        ip,
+        reason: effectiveReason,
       });
     });
   }
@@ -187,68 +242,7 @@ export class PfSenseAgentService implements IFirewallAgent {
     });
   }
 
-  // ══════════════════════════════════════════════════
-  //  IFirewallAgent — isolateHost
-  // ══════════════════════════════════════════════════
 
-  async isolateHost(
-    ip: string,
-    reason?: string,
-    audit?: FirewallAuditMeta,
-  ): Promise<FirewallActionResponse> {
-    const validation = validateBlockIp(ip);
-    if (!validation.valid) throw new Error(validation.error);
-
-    const effectiveReason = reason ?? 'Isolated by Smart SIEM';
-    const inboundName = `SmartSIEM-IsolateIn-${ip}`;
-    const outboundName = `SmartSIEM-IsolateOut-${ip}`;
-
-    return this.write(async () => {
-      const outbound = await this.post('/api/v2/firewall/rule', {
-        type: 'block',
-        interface: ['lan'],
-        ipprotocol: 'inet',
-        source: ip,
-        destination: 'any',
-        descr: `${outboundName} - ${effectiveReason} (outbound)`,
-        disabled: false,
-        log: true,
-      });
-
-      const inbound = await this.post('/api/v2/firewall/rule', {
-        type: 'block',
-        interface: ['lan'],
-        ipprotocol: 'inet',
-        source: 'any',
-        destination: ip,
-        descr: `${inboundName} - ${effectiveReason} (inbound)`,
-        disabled: false,
-        log: true,
-      });
-
-      await this.applyChanges();
-
-      const success = outbound.status === 'ok' && inbound.status === 'ok';
-
-      return this.buildResponse(success, {
-        action_requested: 'isolate_host',
-        action_applied: success ? 'isolate_host' : 'partial',
-        scope: 'network_gateway_bidirectional',
-        effect: `Host ${ip} isolated: inbound and outbound traffic blocked at gateway.`,
-        limitations: [
-          'Isolation applies at network gateway level.',
-          'Host may still communicate with other hosts on the same LAN segment.',
-        ],
-        audit: { ...(audit ?? {}) },
-        ip,
-        reason: effectiveReason,
-        inbound_rule_name: inboundName,
-        outbound_rule_name: outboundName,
-        inboundRuleId: (inbound.data as any)?.id,
-        outboundRuleId: (outbound.data as any)?.id,
-      });
-    });
-  }
 
   // ══════════════════════════════════════════════════
   //  IFirewallAgent — checkIp
@@ -266,48 +260,6 @@ export class PfSenseAgentService implements IFirewallAgent {
     } catch {
       return { blocked: false, rules: [] };
     }
-  }
-
-  // ══════════════════════════════════════════════════
-  //  IFirewallAgent — unblockIp
-  // ══════════════════════════════════════════════════
-
-  async unblockIp(ip: string): Promise<FirewallActionResponse> {
-    return this.write(async () => {
-      // Find all Smart SIEM rules for this IP
-      const checkResult = await this.checkIp(ip);
-      const matchingRules = checkResult.rules as PfSenseRule[];
-      const ruleIds = matchingRules.map((r) => r.id);
-
-      let deletedCount = 0;
-      for (const ruleId of ruleIds) {
-        const delResult = await this.del(
-          `/api/v2/firewall/rule?id=${encodeURIComponent(ruleId)}`,
-        );
-        if (delResult.status === 'ok') deletedCount++;
-      }
-
-      if (deletedCount > 0) {
-        await this.applyChanges();
-      }
-
-      return this.buildResponse(true, {
-        action_requested: 'unblock_ip',
-        action_applied: 'unblock_ip',
-        scope: 'network_wide',
-        effect:
-          deletedCount > 0
-            ? `Removed ${deletedCount} block rule(s) for ${ip}.`
-            : `No Smart SIEM rules found for ${ip} — nothing to remove.`,
-        limitations: [
-          'Only rules created by Smart SIEM are affected.',
-          'Manually created firewall rules must be removed manually.',
-        ],
-        ip,
-        ruleIds,
-        deleted_count: deletedCount,
-      });
-    });
   }
 
   // ══════════════════════════════════════════════════
@@ -493,7 +445,113 @@ export class PfSenseAgentService implements IFirewallAgent {
   }
 
   async listAliases(): Promise<PfSenseResponse<PfSenseAlias[]>> {
-    return this.get('/api/v2/firewall/aliases');
+    const result = await this.get<any>('/api/v2/firewall/aliases');
+    // pfSense API wraps the array in a nested data field
+    if (result.status === 'ok' && result.data && Array.isArray(result.data.data)) {
+      return { status: 'ok', data: result.data.data as PfSenseAlias[] };
+    }
+    if (result.status === 'ok' && Array.isArray(result.data)) {
+      return { status: 'ok', data: result.data as PfSenseAlias[] };
+    }
+    return { status: 'error', data: [], message: 'Unexpected alias list format' };
+  }
+
+  // ══════════════════════════════════════════════════
+  //  Alias helpers
+  // ══════════════════════════════════════════════════
+
+  /**
+   * Add an IP address to a pfSense alias.
+   * Fetches current alias, appends IP, PATCHes back, applies changes.
+   */
+  private async addIpToAlias(
+    aliasName: string,
+    ip: string,
+    reason: string,
+  ): Promise<void> {
+    const allResult = await this.listAliases();
+    const alias = (allResult.data ?? []).find((a: PfSenseAlias) => a.name === aliasName);
+
+    if (alias) {
+      const currentAddresses: string[] = alias.addresses ?? [];
+      if (currentAddresses.includes(ip)) {
+        this.logger.log(`[pfSense] IP ${ip} already in alias "${aliasName}"`);
+        return;
+      }
+      // Delete existing alias (pfSense API doesn't support update)
+      await this.del(`/api/v2/firewall/alias?id=${encodeURIComponent(alias.id)}`).catch(() => {});
+    }
+
+    // Build final list: existing IPs (minus deleted) + new IP
+    const existingAddresses = alias?.addresses ?? [];
+    const existingDetails = alias?.detail ?? [];
+    const filteredAddresses = existingAddresses.filter((a) => a !== ip);
+    const addresses = [...filteredAddresses, ip];
+    // Keep matching detail entries, add new reason for new IP
+    const detail = [
+      ...existingDetails.slice(0, filteredAddresses.length),
+      reason,
+    ];
+
+    const createResult = await this.post('/api/v2/firewall/alias', {
+      name: aliasName,
+      type: 'host',
+      address: addresses,
+      detail,
+      descr: alias?.descr ?? `Smart SIEM - ${aliasName}`,
+    });
+
+    if (createResult.status !== 'ok') {
+      this.logger.error(`[pfSense] Failed to create alias "${aliasName}": ${createResult.message}`);
+      throw new Error(`Failed to update alias "${aliasName}": ${createResult.message}`);
+    }
+
+    await this.applyChanges();
+    this.logger.log(
+      `[pfSense] Added ${ip} to alias "${aliasName}" (${addresses.length} total)`,
+    );
+  }
+
+  private async removeIpFromAlias(
+    aliasName: string,
+    ip: string,
+  ): Promise<void> {
+    const allResult = await this.listAliases();
+    const alias = (allResult.data ?? []).find((a: PfSenseAlias) => a.name === aliasName);
+    if (!alias) {
+      this.logger.log(`[pfSense] Alias "${aliasName}" not found, nothing to remove`);
+      return;
+    }
+    const currentAddresses: string[] = alias.addresses ?? [];
+
+    if (!currentAddresses.includes(ip)) {
+      this.logger.log(`[pfSense] IP ${ip} not in alias "${aliasName}"`);
+      return;
+    }
+
+    const addresses = currentAddresses.filter((a) => a !== ip);
+
+    // Delete and recreate
+    await this.del(`/api/v2/firewall/alias?id=${encodeURIComponent(alias.id)}`).catch(() => {});
+
+    const createResult = await this.post('/api/v2/firewall/alias', {
+      name: aliasName,
+      type: 'host',
+      address: addresses,
+      detail: addresses.map(() => 'Smart SIEM'),
+      descr: alias.descr ?? '',
+    });
+
+    if (createResult.status !== 'ok') {
+      throw new Error(
+        `Failed to recreate alias "${aliasName}": ${createResult.message}`,
+      );
+    }
+
+    await this.applyChanges();
+    this.logger.log(
+      `[pfSense] Removed ${ip} from alias "${aliasName}" (${addresses.length} total)`,
+    );
   }
 
   // ══════════════════════════════════════════════════

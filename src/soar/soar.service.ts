@@ -118,6 +118,35 @@ export class SoarService {
           'Security incident detected',
           this.logger,
         );
+        // Record each blocked IP as a SoarAction
+        const blocked = ((result as any)?.blocked ?? []) as string[];
+        for (const ip of blocked) {
+          await this.recordAction(incidentId, 'block_ip', ip, result as any).catch(() => {});
+        }
+        // Auto-resolve incident if IPs were blocked
+        if (blocked.length > 0) {
+          await this.autoResolveIncident(incidentId, playbookName).catch(() => {});
+        }
+        return result as any;
+      }
+
+      case 'isolate_endpoint': {
+        if (hosts.length === 0)
+          return { skipped: true, reason: 'no hosts to isolate' };
+        const result = await isolateHostPlaybook(
+          this.agent,
+          hosts,
+          'Suspicious host detected',
+          this.logger,
+        );
+        // Record each isolated host as a SoarAction
+        const isolated = ((result as any)?.isolated ?? []) as string[];
+        for (const host of isolated) {
+          await this.recordAction(incidentId, 'isolate_host', host, result as any).catch(() => {});
+        }
+        if (isolated.length > 0) {
+          await this.autoResolveIncident(incidentId, playbookName).catch(() => {});
+        }
         return result as any;
       }
 
@@ -271,6 +300,135 @@ export class SoarService {
       select: { related_entities: true, summary: true },
     });
     return (incident?.related_entities as any) ?? null;
+  }
+
+  // ══════════════════════════════════════════════════
+  //  SoarAction tracking
+  // ══════════════════════════════════════════════════
+
+  /**
+   * Record a SOAR action in the database for audit and undo.
+   */
+  private async recordAction(
+    incidentId: string,
+    actionType: string,
+    target: string,
+    resultPayload: Record<string, unknown>,
+  ): Promise<void> {
+    const execution = await this.prisma.playbookExecution.findFirst({
+      where: { incident_id: incidentId },
+      orderBy: { initiated_at: 'desc' },
+      select: { id: true },
+    });
+
+    await this.prisma.$executeRawUnsafe(
+      'INSERT INTO soar_actions (id, incident_id, execution_id, action_type, target, status, provider, description, result_payload) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)',
+      incidentId,
+      execution?.id ?? null,
+      actionType,
+      target,
+      'EXECUTED',
+      this.agent.provider,
+      `Action: ${actionType} on ${target}`,
+      JSON.stringify(resultPayload),
+    );
+  }
+
+  /**
+   * Auto-resolve the incident if the playbook succeeded.
+   */
+  private async autoResolveIncident(
+    incidentId: string,
+    playbookName: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.incident.update({
+        where: { id: incidentId },
+        data: {
+          status: 'RESOLVED',
+          resolved_at: new Date(),
+        },
+      });
+      this.logger.log(
+        `[SOAR] Auto-resolved incident ${incidentId} after ${playbookName} executed`,
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `[SOAR] Failed to auto-resolve incident ${incidentId}: ${err.message}`,
+      );
+    }
+  }
+
+  /**
+   * List all SOAR actions, with optional filter by incident.
+   */
+  async listActions(incidentId?: string) {
+    if (incidentId) {
+      return this.prisma.$queryRawUnsafe(
+        'SELECT id, incident_id, execution_id, action_type, target, status, provider, description, created_at, reverted_at FROM soar_actions WHERE incident_id = $1 ORDER BY created_at DESC',
+        incidentId,
+      );
+    }
+    return this.prisma.$queryRawUnsafe(
+      'SELECT id, incident_id, execution_id, action_type, target, status, provider, description, created_at, reverted_at FROM soar_actions ORDER BY created_at DESC LIMIT 100',
+    );
+  }
+
+  /**
+   * Undo a SOAR action: reverse the firewall operation.
+   */
+  async undoAction(actionId: string): Promise<Record<string, unknown>> {
+    const action = await this.prisma.$queryRawUnsafe<
+      Array<Record<string, unknown>>
+    >('SELECT * FROM soar_actions WHERE id = $1', actionId);
+
+    if (!action || (action as any[]).length === 0) {
+      throw new NotFoundException('SOAR action not found');
+    }
+
+    const act = (action as any[])[0];
+
+    if (act.status === 'REVERTED') {
+      return { error: 'Action already reverted', action_id: actionId };
+    }
+
+    let reverseResult: Record<string, unknown> = {};
+
+    try {
+      switch (act.action_type) {
+        case 'block_ip':
+          reverseResult = (await this.agent.unblockIp(act.target)) as any;
+          break;
+        case 'isolate_host':
+          if ('unIsolateHost' in this.agent) {
+            reverseResult = (await (
+              this.agent as any
+            ).unIsolateHost(act.target)) as any;
+          }
+          break;
+        default:
+          return { error: `Cannot undo action type: ${act.action_type}` };
+      }
+
+      await this.prisma.$executeRawUnsafe(
+        "UPDATE soar_actions SET status = 'REVERTED', reverted_at = NOW() WHERE id = $1",
+        actionId,
+      );
+
+      this.logger.warn(
+        `[SOAR] Undid action ${actionId}: ${act.action_type} on ${act.target}`,
+      );
+
+      return {
+        action_id: actionId,
+        action_type: act.action_type,
+        target: act.target,
+        status: 'REVERTED',
+        reverse_result: reverseResult,
+      };
+    } catch (err: any) {
+      return { error: err.message, action_id: actionId };
+    }
   }
 
   async abortPlaybook(executionId: string) {

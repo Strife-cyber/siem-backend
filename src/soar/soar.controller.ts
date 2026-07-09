@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
   Inject,
@@ -208,6 +209,23 @@ export class SoarController {
   // ══════════════════════════════════════════════════
   //  Status (provider-agnostic, alias of health)
   // ══════════════════════════════════════════════════
+
+  // ══════════════════════════════════════════════════
+  //  SOAR Action tracking — undo & audit
+  // ══════════════════════════════════════════════════
+
+  @Get('actions')
+  @ApiOperation({ summary: 'List all SOAR actions (block/unblock/isolate) with undo support' })
+  async listActions(@Query('incident_id') incidentId?: string) {
+    return this.soarService.listActions(incidentId);
+  }
+
+  @Post('actions/:id/undo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Undo a SOAR action (unblock IP or un-isolate host)' })
+  async undoAction(@Param('id') id: string) {
+    return this.soarService.undoAction(id);
+  }
 
   @Get('status')
   @ApiOperation({ summary: 'Get the active firewall provider status' })
