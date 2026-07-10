@@ -82,7 +82,7 @@ services:
 
   # ── Populates the shared frontend assets volume on startup ──
   frontend-assets:
-    image: cloudx02/siem-frontend:0.0.7
+    image: cloudx02/siem-frontend:1.1.0
     container_name: siem-frontend-assets
     user: root
     volumes:
