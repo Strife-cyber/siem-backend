@@ -230,14 +230,22 @@ export class ElasticsearchService implements OnModuleInit {
     return { indexed: logs.length };
   }
 
+  /** Crude but fast IP validation (IPv4 dotted or IPv6) */
+  private isValidIp(value: string): boolean {
+    return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/.test(value) ||
+      /^[0-9a-fA-F:]+(\/\d{1,3})?$/.test(value);
+  }
+
   async search(query: LogSearchQuery) {
     const must: Record<string, unknown>[] = [];
     const filter: Record<string, unknown>[] = [];
 
-    if (query.source_ip) {
+    // ES maps source_ip/destination_ip as type:ip — sending a non-IP string
+    // (e.g. partial autocomplete like 't') throws a parse exception.
+    if (query.source_ip && this.isValidIp(query.source_ip)) {
       must.push({ term: { source_ip: query.source_ip } });
     }
-    if (query.destination_ip) {
+    if (query.destination_ip && this.isValidIp(query.destination_ip)) {
       must.push({ term: { destination_ip: query.destination_ip } });
     }
     if (query.user_principal) {
@@ -318,12 +326,29 @@ export class ElasticsearchService implements OnModuleInit {
     const must: Record<string, unknown>[] = [];
 
     if (q) {
+      // Text/keyword fields only — IP fields cannot participate in multi_match
+      // with non-IP strings without throwing a parse exception.
       must.push({
         multi_match: {
           query: q,
-          fields: ['raw_message', 'hostname', 'source_ip', 'user_principal'],
+          fields: ['raw_message', 'hostname', 'user_principal'],
         },
       });
+
+      // If the search term looks like an IP address (partial or full),
+      // also match against IP-typed fields.
+      if (/^[\d.]+$/.test(q) || /^[0-9a-fA-F:]+$/.test(q)) {
+        must.push({
+          bool: {
+            should: [
+              { term: { source_ip: q } },
+              { term: { destination_ip: q } },
+              { term: { source_network_address: q } },
+            ],
+            minimum_should_match: 1,
+          },
+        });
+      }
     }
 
     const response = await this.client.search({

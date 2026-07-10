@@ -66,7 +66,7 @@ services:
       - siem-network
 
   frontend:
-    image: cloudx02/siem-frontend:0.0.5
+    image: cloudx02/siem-frontend:0.0.7
     container_name: siem-frontend
     environment:
       VITE_API_URL: http://localhost
@@ -80,6 +80,18 @@ services:
     networks:
       - siem-network
 
+  # ── Populates the shared frontend assets volume on startup ──
+  frontend-assets:
+    image: cloudx02/siem-frontend:0.0.7
+    container_name: siem-frontend-assets
+    user: root
+    volumes:
+      - frontend_assets:/output:rw
+      - ./frontend-assets-init.sh:/init.sh:ro
+    command: sh /init.sh
+    networks:
+      - siem-network
+
   caddy:
     image: caddy:2-alpine
     container_name: siem-caddy
@@ -89,9 +101,12 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
+      - frontend_assets:/var/www/frontend:ro
     depends_on:
-      - frontend
-      - app
+      frontend-assets:
+        condition: service_completed_successfully
+      app:
+        condition: service_started
     networks:
       - siem-network
 
@@ -141,6 +156,8 @@ volumes:
   elasticsearch_data:
     driver: local
   caddy_data:
+    driver: local
+  frontend_assets:
     driver: local
 
 networks:

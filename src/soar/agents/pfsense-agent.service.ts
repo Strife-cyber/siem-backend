@@ -341,11 +341,11 @@ export class PfSenseAgentService implements IFirewallAgent {
     if (!this.isConfigured) return result;
 
     try {
-      const info = await this.get('/api/v2/system/info');
+      const info = await this.get('/api/v2/system/version');
       if (info.status === 'ok') {
         const d = info.data as any;
         result.reachable = true;
-        result.version = d?.version ?? d?.data?.version;
+        result.version = d?.data?.version ?? d?.version;
       }
     } catch (err: any) {
       result.error = err.message;
