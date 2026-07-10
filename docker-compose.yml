@@ -66,7 +66,7 @@ services:
       - siem-network
 
   frontend:
-    image: cloudx02/siem-frontend:0.0.7
+    image: cloudx02/siem-frontend:1.1.1
     container_name: siem-frontend
     environment:
       VITE_API_URL: http://localhost
@@ -82,7 +82,7 @@ services:
 
   # ── Populates the shared frontend assets volume on startup ──
   frontend-assets:
-    image: cloudx02/siem-frontend:1.1.0
+    image: cloudx02/siem-frontend:1.1.1
     container_name: siem-frontend-assets
     user: root
     volumes:
