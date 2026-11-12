@@ -12,21 +12,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
-
-export const RISK_BANDS = [
-  { name: 'Informational', min: 0, max: 19 },
-  { name: 'Low', min: 20, max: 39 },
-  { name: 'Medium', min: 40, max: 59 },
-  { name: 'High', min: 60, max: 79 },
-  { name: 'Critical', min: 80, max: 100 },
-] as const;
-
-export function riskBand(score: number): string {
-  return (
-    RISK_BANDS.find((b) => score >= b.min && score <= b.max)?.name ??
-    'Informational'
-  );
-}
+import { riskBand } from './risk-scoring.service';
 
 @ApiTags('Entities')
 @ApiBearerAuth('BearerAuth')

@@ -26,6 +26,7 @@ export class MitreController {
         rules: {
           rule_id: string;
           name: string;
+          tactic: string | null;
           layer: number;
           incidents: number;
           is_active: boolean;
@@ -36,22 +37,30 @@ export class MitreController {
 
     for (const rule of rules) {
       const definition = (rule.definition ?? {}) as { layer?: number };
-      const technique = rule.technique ?? 'Unmapped';
-      const entry = techniques.get(technique) ?? {
-        technique,
-        tactic: rule.tactic,
-        rules: [],
-        total_incidents: 0,
-      };
-      entry.rules.push({
-        rule_id: rule.id,
-        name: rule.name,
-        layer: definition.layer ?? 1,
-        incidents: rule._count.incidents,
-        is_active: rule.is_active,
-      });
-      entry.total_incidents += rule._count.incidents;
-      techniques.set(technique, entry);
+      // Some rules map to several techniques ("T1562+T1489+T1486").
+      const ruleTechniques = (rule.technique ?? 'Unmapped')
+        .split(/[+,]/)
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      for (const technique of ruleTechniques) {
+        const entry = techniques.get(technique) ?? {
+          technique,
+          tactic: rule.tactic,
+          rules: [],
+          total_incidents: 0,
+        };
+        entry.rules.push({
+          rule_id: rule.id,
+          name: rule.name,
+          tactic: rule.tactic,
+          layer: definition.layer ?? 1,
+          incidents: rule._count.incidents,
+          is_active: rule.is_active,
+        });
+        entry.total_incidents += rule._count.incidents;
+        techniques.set(technique, entry);
+      }
     }
 
     return {
