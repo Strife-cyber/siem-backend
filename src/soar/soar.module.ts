@@ -3,6 +3,7 @@ import { SoarController } from './soar.controller';
 import { SoarService } from './soar.service';
 import { PfSenseAgentService } from './agents/pfsense-agent.service';
 import { WindowsDefenderAgentClientService } from './agents/windows-defender-agent.service';
+import { DryRunAgentService } from './agents/dry-run-agent.service';
 import {
   FIREWALL_AGENT,
   IFirewallAgent,
@@ -13,6 +14,7 @@ const firewallAgentProvider = {
   useFactory: (
     wd: WindowsDefenderAgentClientService,
     pf: PfSenseAgentService,
+    dryRun: DryRunAgentService,
   ): IFirewallAgent => {
     const provider = (
       process.env.SOAR_FIREWALL_PROVIDER || 'windows_defender'
@@ -27,10 +29,13 @@ const firewallAgentProvider = {
       case 'windows_defender':
         agent = wd;
         break;
+      case 'dry_run':
+        agent = dryRun;
+        break;
       default:
         throw new Error(
           `Unknown SOAR_FIREWALL_PROVIDER: "${provider}". ` +
-            `Valid values: "pfsense", "windows_defender".`,
+            `Valid values: "pfsense", "windows_defender", "dry_run".`,
         );
     }
 
@@ -49,7 +54,11 @@ const firewallAgentProvider = {
 
     return agent;
   },
-  inject: [WindowsDefenderAgentClientService, PfSenseAgentService],
+  inject: [
+    WindowsDefenderAgentClientService,
+    PfSenseAgentService,
+    DryRunAgentService,
+  ],
 };
 
 @Module({
@@ -58,6 +67,7 @@ const firewallAgentProvider = {
     SoarService,
     PfSenseAgentService,
     WindowsDefenderAgentClientService,
+    DryRunAgentService,
     firewallAgentProvider,
   ],
   exports: [SoarService],
