@@ -1,0 +1,38 @@
+{
+  "name": "c002-brute-to-compromise",
+  "description": "C002: brute force (R001) followed by successful login (R008) for the same account from one IP within 30 minutes, no recon. Expects C002 HIGH correlation incident and temporary_block AUTO response.",
+  "base_time": "2026-11-12T11:06:00Z",
+  "requires_rules": ["R001", "R008", "C002"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "SRV-WEB-02",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 10:05:00 srv-web-02 sshd[5101]: Failed password for svc_backup from 10.2.0.5 port 53001 ssh2" },
+        { "offset_seconds": 2, "raw": "Nov 12 10:05:02 srv-web-02 sshd[5102]: Failed password for svc_backup from 10.2.0.5 port 53002 ssh2" },
+        { "offset_seconds": 4, "raw": "Nov 12 10:05:04 srv-web-02 sshd[5103]: Failed password for svc_backup from 10.2.0.5 port 53003 ssh2" },
+        { "offset_seconds": 6, "raw": "Nov 12 10:05:06 srv-web-02 sshd[5104]: Failed password for svc_backup from 10.2.0.5 port 53004 ssh2" },
+        { "offset_seconds": 8, "raw": "Nov 12 10:05:08 srv-web-02 sshd[5105]: Failed password for svc_backup from 10.2.0.5 port 53005 ssh2" },
+        { "offset_seconds": 10, "raw": "Nov 12 10:05:10 srv-web-02 sshd[5106]: Failed password for svc_backup from 10.2.0.5 port 53006 ssh2" },
+        { "offset_seconds": 12, "raw": "Nov 12 10:05:12 srv-web-02 sshd[5107]: Failed password for svc_backup from 10.2.0.5 port 53007 ssh2" },
+        { "offset_seconds": 15, "raw": "Nov 12 10:05:15 srv-web-02 sshd[5108]: Accepted password for svc_backup from 10.2.0.5 port 53008 ssh2" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R001", "min_severity": "WARNING", "min_count": 1 },
+      { "rule_id": "R008", "min_severity": "HIGH", "min_count": 1 },
+      { "rule_id": "C002", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_playbook_executions": [
+      { "playbook_name": "temporary_block", "status": "EXECUTED", "min_count": 1 }
+    ],
+    "expect_entity_risk": [
+      { "entity_type": "USER", "value": "svc_backup", "min_score": 40 }
+    ],
+    "expect_entity_edges": [
+      { "source_type": "IP", "source_value": "10.2.0.5", "relationship": "USED_ACCOUNT", "target_type": "USER", "target_value": "svc_backup" }
+    ]
+  }
+}

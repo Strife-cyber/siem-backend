@@ -9,10 +9,15 @@ import { PassTheHashRule } from './rules/r002-pass-the-hash.rule';
 import { DataExfilRule } from './rules/r003-data-exfiltration.rule';
 import { LogClearingRule } from './rules/r004-log-clearing.rule';
 import { ReconnaissanceRule } from './rules/r005-reconnaissance.rule';
+import { SuccessfulLoginAfterFailuresRule } from './rules/r008-successful-login-after-failures.rule';
+import { ATTACK_CORRELATION_RULES } from './rules/attack-correlation.rules';
 import type {
   DetectionRule,
   DetectionResult,
 } from './interfaces/detection-rule.interface';
+import type { AttackCorrelationResult } from './interfaces/attack-correlation.interface';
+import { EntityGraphService } from '../entities/entity-graph.service';
+import { RiskScoringService } from '../entities/risk-scoring.service';
 
 export interface CycleReport {
   cycleId: string;
@@ -44,10 +49,15 @@ export class CorrelationService {
     new DataExfilRule(),
     new LogClearingRule(),
     new ReconnaissanceRule(),
+    new SuccessfulLoginAfterFailuresRule(),
   ];
+
+  /** Layer-2 attack correlation rules (C001–C003) — run after event rules */
+  private readonly attackRules = ATTACK_CORRELATION_RULES;
 
   /** Track when each rule last ran to avoid re-scanning old events */
   private readonly lastRunPerRule = new Map<string, Date>();
+  private readonly lastRunPerAttackRule = new Map<string, Date>();
 
   constructor(
     private readonly es: ElasticsearchService,
@@ -57,6 +67,8 @@ export class CorrelationService {
     @InjectQueue('logs') private readonly logsQueue: Queue,
     @InjectQueue('ueba') private readonly uebaQueue: Queue,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
+    private readonly entityGraph: EntityGraphService,
+    private readonly riskScoring: RiskScoringService,
   ) {}
 
   async runCycle(): Promise<CycleReport> {
@@ -217,6 +229,56 @@ export class CorrelationService {
       results.push(ruleResult);
     }
 
+    // ── Layer 2: attack correlation rules (consume incidents from Layer 1) ──
+    for (const rule of this.attackRules) {
+      if (!activeRuleIds.has(rule.id)) continue;
+
+      const attackResult: RuleResult = {
+        ruleId: rule.id,
+        ruleName: rule.name,
+        status: 'ran',
+        esQueryTimeWindow: 'incident-history',
+        incidentsCreated: 0,
+      };
+
+      try {
+        const since = this.lastRunPerAttackRule.get(rule.id) ?? new Date(0);
+        this.logger.log(
+          `[CORRELATE] Running ${rule.id} - ${rule.name} (since ${since.toISOString().slice(11, 19)})`,
+        );
+
+        const detections = await rule.detect(this.prisma, since);
+        this.lastRunPerAttackRule.set(rule.id, new Date());
+
+        this.logger.log(
+          `  [DATA] ${rule.id}: ${detections.length} correlation(s) found`,
+        );
+
+        for (const det of detections) {
+          await this.handleAttackDetection(det);
+          attackResult.incidentsCreated++;
+          totalIncidentsCreated++;
+        }
+
+        if (detections.length > 0) {
+          this.logger.warn(
+            `  [ALERT] ${rule.id}: ${detections.length} correlation incident(s) created!`,
+          );
+          for (const det of detections) {
+            this.logger.warn(`     -> ${det.severity}: ${det.summary}`);
+          }
+        }
+      } catch (error: any) {
+        attackResult.status = 'error';
+        attackResult.error = error.message ?? String(error);
+        this.logger.error(
+          `  [FAIL] ${rule.id} failed: ${error.message ?? error}`,
+        );
+      }
+
+      results.push(attackResult);
+    }
+
     const elapsed = Date.now() - startTime;
 
     const report: CycleReport = {
@@ -290,6 +352,9 @@ export class CorrelationService {
       const rule = this.builtinRules.find((r) => r.id === result.rule_id);
       await this.storeMatchingEvents(incident.id, result, rule?.definition);
 
+      // TDIR Phase 1: entity graph + decaying risk scoring
+      await this.recordEntitiesAndRisk(incident.id, result);
+
       this.logger.warn(
         `  [NEW] Incident ${incident.id}: ${result.severity} - ${result.summary}`,
       );
@@ -318,6 +383,129 @@ export class CorrelationService {
     } catch (error: any) {
       this.logger.error(
         `  [FAIL] Failed to handle detection: ${error.message ?? error}`,
+      );
+    }
+  }
+
+  /** Entity graph nodes/edges + rule-deduplicated decaying risk score. */
+  private async recordEntitiesAndRisk(
+    incidentId: string,
+    result: DetectionResult,
+  ): Promise<void> {
+    try {
+      const entityIds = await this.entityGraph.recordDetection(
+        result,
+        incidentId,
+      );
+      const observedAt = new Date();
+      for (const entityId of entityIds) {
+        await this.riskScoring.applyDetection(
+          entityId,
+          result.rule_id,
+          incidentId,
+          result.severity,
+          observedAt,
+        );
+      }
+      await this.entityGraph.recordEdges(incidentId, result.rule_id);
+    } catch (error: any) {
+      // Non-blocking: graph/risk failure must not lose the incident
+      this.logger.warn(
+        `  [GRAPH] Entity/risk recording failed for ${incidentId}: ${error.message ?? error}`,
+      );
+    }
+  }
+
+  /** Handle a Layer-2 attack correlation detection (C001–C010). */
+  private async handleAttackDetection(
+    result: AttackCorrelationResult,
+  ): Promise<void> {
+    try {
+      const duplicate = await this.findRecentDuplicate(result);
+      if (duplicate) {
+        this.logger.log(
+          `  [SKIP] Duplicate for ${result.rule_id}: correlation already fired in last 5min`,
+        );
+        return;
+      }
+
+      const incident = await this.prisma.incident.create({
+        data: {
+          rule_id: result.rule_id,
+          severity: result.severity as any,
+          confidence_score: result.confidence_score,
+          summary: result.summary,
+          related_entities: JSON.parse(JSON.stringify(result.related_entities)),
+          status: 'OPEN',
+        },
+      });
+
+      // Store the prerequisite incidents as correlation evidence
+      const prereqs = await this.prisma.incident.findMany({
+        where: { id: { in: result.prerequisite_incident_ids } },
+        select: {
+          id: true,
+          rule_id: true,
+          triggered_at: true,
+          related_entities: true,
+        },
+      });
+      for (const p of prereqs) {
+        const ent = (p.related_entities ?? {}) as {
+          ips?: string[];
+          users?: string[];
+          hosts?: string[];
+        };
+        await this.prisma.incidentEvent
+          .create({
+            data: {
+              incident_id: incident.id,
+              collected_at: p.triggered_at,
+              source_ip: ent.ips?.[0] ?? null,
+              hostname: ent.hosts?.[0] ?? null,
+              user_principal: ent.users?.[0] ?? null,
+              action: 'CORRELATION',
+              outcome: p.rule_id ?? null,
+              raw_message: `Prerequisite incident ${p.id} (${p.rule_id})`,
+            },
+          })
+          .catch((err) =>
+            this.logger.warn(
+              `  [EVENTS] Failed to store correlation evidence: ${err.message}`,
+            ),
+          );
+      }
+
+      this.logger.warn(
+        `  [NEW] Correlation incident ${incident.id}: ${result.severity} - ${result.summary}`,
+      );
+
+      this.notificationsQueue
+        .add('incident-alert', { incidentId: incident.id })
+        .catch(() => {});
+
+      // Entity graph + risk for the correlation itself
+      await this.recordEntitiesAndRisk(incident.id, result);
+
+      if (result.response) {
+        this.logger.log(
+          `  [SOAR] Triggering playbook "${result.response.playbook}" (${result.response.mode}) for incident ${incident.id}`,
+        );
+        await this.soar
+          .executePlaybook({
+            incident_id: incident.id,
+            playbook_name: result.response.playbook,
+            mode: result.response.mode,
+          })
+          .catch((err) => {
+            this.logger.error(
+              `  [FAIL] SOAR trigger failed for ${incident.id}: ${err.message}`,
+            );
+          });
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `  [FAIL] Failed to handle attack detection: ${error.message ?? error}`,
       );
     }
   }
