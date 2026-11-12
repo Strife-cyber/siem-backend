@@ -21,7 +21,9 @@ export class LogsRetentionService {
    * Archive logs older than `retentionDays` into one JSON file,
    * then delete those archived documents from Elasticsearch.
    */
-  async archiveAndPurge(retentionDays: number = 30): Promise<RetentionArchiveResult> {
+  async archiveAndPurge(
+    retentionDays: number = 30,
+  ): Promise<RetentionArchiveResult> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const cutoffIso = cutoff.toISOString();
 
@@ -59,7 +61,10 @@ export class LogsRetentionService {
     await mkdir(backupDir, { recursive: true });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const archivePath = path.join(backupDir, `logs-archive-before-${timestamp}.json`);
+    const archivePath = path.join(
+      backupDir,
+      `logs-archive-before-${timestamp}.json`,
+    );
 
     const archivedDocs: Record<string, unknown>[] = [];
     let searchAfter: (string | number)[] | undefined;
@@ -86,7 +91,9 @@ export class LogsRetentionService {
         archivedDocs.push(hit._source as Record<string, unknown>);
       }
 
-      searchAfter = hits[hits.length - 1].sort as (string | number)[] | undefined;
+      searchAfter = hits[hits.length - 1].sort as
+        | (string | number)[]
+        | undefined;
       if (!searchAfter) break;
     }
 

@@ -232,8 +232,10 @@ export class ElasticsearchService implements OnModuleInit {
 
   /** Crude but fast IP validation (IPv4 dotted or IPv6) */
   private isValidIp(value: string): boolean {
-    return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/.test(value) ||
-      /^[0-9a-fA-F:]+(\/\d{1,3})?$/.test(value);
+    return (
+      /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/.test(value) ||
+      /^[0-9a-fA-F:]+(\/\d{1,3})?$/.test(value)
+    );
   }
 
   async search(query: LogSearchQuery) {

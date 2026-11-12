@@ -1,6 +1,11 @@
 import { IsString, IsOptional, IsIn } from 'class-validator';
 
-const VALID_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'FALSE_POSITIVE'] as const;
+const VALID_STATUSES = [
+  'OPEN',
+  'INVESTIGATING',
+  'RESOLVED',
+  'FALSE_POSITIVE',
+] as const;
 
 export class UpdateFlagDto {
   @IsOptional()

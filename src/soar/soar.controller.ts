@@ -8,20 +8,15 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  Inject,
-  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiOkResponse,
-  ApiCreatedResponse,
+  ApiAcceptedResponse,
 } from '@nestjs/swagger';
-import { FIREWALL_AGENT } from './agents/firewall-agent.interface';
-import type { IFirewallAgent } from './agents/firewall-agent.interface';
 import { SoarService } from './soar.service';
-import { PfSenseAgentService } from './agents/pfsense-agent.service';
 import {
   PlaybookExecutionDto,
   AbortPlaybookDto,
@@ -31,42 +26,42 @@ import {
   DirectAliasDto,
   UnblockIpDto,
 } from './dto/soar.dto';
-import { blockIpPlaybook } from './playbooks/block-ip.playbook';
-import { blockPortPlaybook } from './playbooks/block-port.playbook';
-import { temporaryBlockPlaybook } from './playbooks/temporary-block.playbook';
-import { checkIpPlaybook } from './playbooks/check-ip.playbook';
-import {
-  createAliasPlaybook,
-  deleteAliasPlaybook,
-} from './playbooks/aliases.playbook';
-import { Logger } from '@nestjs/common';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../generated/prisma/enums';
 
+/**
+ * SOAR endpoints.
+ *
+ * RBAC (FR-06.3): every state-changing action (execute/approve/abort playbooks,
+ * block/unblock IPs or ports, manage aliases and firewall rules) requires
+ * ANALYST or ADMIN. Read-only queries (status, health, pending queue,
+ * action history, IP checks) are open to any authenticated role.
+ */
 @ApiTags('SOAR')
 @ApiBearerAuth('BearerAuth')
 @Controller('soar')
 export class SoarController {
-  private readonly logger = new Logger(SoarController.name);
-
-  constructor(
-    private readonly soarService: SoarService,
-    @Inject(FIREWALL_AGENT) private readonly agent: IFirewallAgent,
-  ) {}
+  constructor(private readonly soarService: SoarService) {}
 
   // ══════════════════════════════════════════════════
   //  Playbook execution
   // ══════════════════════════════════════════════════
 
   @Post('execute')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Execute a SOAR playbook from an incident' })
-  @ApiCreatedResponse({ description: 'Playbook queued' })
+  @ApiOperation({
+    summary: 'Execute a SOAR playbook from an incident (ANALYST+)',
+  })
+  @ApiAcceptedResponse({ description: 'Playbook queued' })
   async executePlaybook(@Body() dto: PlaybookExecutionDto) {
     return this.soarService.executePlaybook(dto);
   }
 
   @Post('abort')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Abort a pending playbook execution' })
+  @ApiOperation({ summary: 'Abort a pending playbook execution (ANALYST+)' })
   @ApiOkResponse({ description: 'Aborted successfully' })
   async abortPlaybook(@Body() dto: AbortPlaybookDto) {
     return this.soarService.abortPlaybook(dto.execution_id);
@@ -77,77 +72,84 @@ export class SoarController {
   // ══════════════════════════════════════════════════
 
   @Post('block-ip')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Block an IP address on the active firewall' })
+  @ApiOperation({
+    summary: 'Block an IP address on the active firewall (ANALYST+)',
+  })
   async directBlockIp(@Body() dto: DirectBlockIpDto) {
-    const result = await blockIpPlaybook(
-      this.agent,
-      [dto.ip],
-      dto.reason ?? 'Manual block',
-      this.logger,
-    );
-    return result;
+    return this.soarService.directBlockIp(dto.ip, dto.reason);
   }
 
   @Post('block-port')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Block a specific port from an IP on the active firewall' })
+  @ApiOperation({
+    summary:
+      'Block a specific port from an IP on the active firewall (ANALYST+)',
+  })
   async directBlockPort(@Body() dto: DirectBlockPortDto) {
-    const result = await blockPortPlaybook(
-      this.agent,
-      [{ ip: dto.ip, port: dto.port, protocol: dto.protocol }],
-      dto.reason ?? 'Manual port block',
-      this.logger,
+    return this.soarService.directBlockPort(
+      dto.ip,
+      dto.port,
+      dto.protocol,
+      dto.reason,
     );
-    return result;
   }
 
   @Post('temporary-block')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Temporarily block an IP for a given duration' })
+  @ApiOperation({
+    summary: 'Temporarily block an IP for a given duration (ANALYST+)',
+  })
   async directTempBlock(@Body() dto: DirectTempBlockDto) {
-    const result = await temporaryBlockPlaybook(
-      this.agent,
-      undefined,
-      [dto.ip],
-      dto.reason ?? 'Temporary manual block',
+    return this.soarService.directTemporaryBlock(
+      dto.ip,
       dto.ttl_seconds,
-      '00000000-0000-0000-0000-000000000000',
-      this.logger,
+      dto.reason,
     );
-    return result;
   }
 
   @Get('check-ip/:ip')
   @ApiOperation({ summary: 'Check if an IP is blocked on the active firewall' })
   async directCheckIp(@Param('ip') ip: string) {
-    return checkIpPlaybook(this.agent, ip, this.logger);
+    return this.soarService.checkIp(ip);
   }
 
   @Post('unblock-ip')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Unblock an IP address on the active firewall' })
+  @ApiOperation({
+    summary: 'Unblock an IP address on the active firewall (ANALYST+)',
+  })
   async unblockIp(@Body() dto: UnblockIpDto) {
-    return this.agent.unblockIp(dto.ip);
+    return this.soarService.unblockIp(dto.ip);
   }
 
   @Get('rules')
   @ApiOperation({ summary: 'List all firewall rules managed by Smart SIEM' })
   async listRules() {
-    return this.agent.listRules();
+    return this.soarService.listFirewallRules();
   }
 
   @Delete('rule/:name')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a specific firewall rule by its name' })
+  @ApiOperation({
+    summary: 'Delete a specific firewall rule by its name (ANALYST+)',
+  })
   async deleteRule(@Param('name') name: string) {
-    return this.agent.deleteRule(name);
+    return this.soarService.deleteFirewallRule(name);
   }
 
   @Get('health')
   @ApiOperation({ summary: 'Get the active firewall provider health status' })
+  @ApiOkResponse({
+    description: 'Firewall provider status with version, rules count, etc.',
+  })
   async healthCheck() {
-    return this.agent.healthCheck();
+    return this.soarService.firewallHealth();
   }
 
   // ══════════════════════════════════════════════════
@@ -156,15 +158,19 @@ export class SoarController {
 
   @Get('pending')
   @ApiOperation({
-    summary: 'List all playbook executions pending analyst approval (CONFIRM mode)',
+    summary:
+      'List all playbook executions pending analyst approval (CONFIRM mode)',
   })
   async getPendingExecutions() {
     return this.soarService.getPendingExecutions();
   }
 
   @Post('approve/:executionId')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve a CONFIRM-mode playbook execution' })
+  @ApiOperation({
+    summary: 'Approve a CONFIRM-mode playbook execution (ANALYST+)',
+  })
   async approveExecution(@Param('executionId') executionId: string) {
     return this.soarService.approveExecution(executionId);
   }
@@ -174,36 +180,34 @@ export class SoarController {
   // ══════════════════════════════════════════════════
 
   @Post('aliases')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Create an IP alias on pfSense (pfSense only)' })
+  @ApiOperation({
+    summary: 'Create an IP alias on pfSense (pfSense only, ANALYST+)',
+  })
   async createAlias(@Body() dto: DirectAliasDto) {
-    this.ensurePfSense('create aliases');
-    const pfsense = this.agent as unknown as PfSenseAgentService;
-    return createAliasPlaybook(
-      pfsense,
+    return this.soarService.createAlias(
       dto.name,
       dto.addresses,
-      dto.description ?? 'Smart SIEM alias',
-      this.logger,
+      dto.description,
     );
   }
 
   @Post('aliases/:id/delete')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Delete an IP alias from pfSense by its ID (pfSense only)' })
+  @ApiOperation({
+    summary:
+      'Delete an IP alias from pfSense by its ID (pfSense only, ANALYST+)',
+  })
   async deleteAlias(@Param('id') id: string) {
-    this.ensurePfSense('delete aliases');
-    const pfsense = this.agent as unknown as PfSenseAgentService;
-    return deleteAliasPlaybook(pfsense, id, this.logger);
+    return this.soarService.deleteAlias(id);
   }
 
   @Get('aliases')
   @ApiOperation({ summary: 'List all aliases from pfSense (pfSense only)' })
   async listAliases() {
-    this.ensurePfSense('list aliases');
-    const pfsense = this.agent as unknown as PfSenseAgentService;
-    const result = await pfsense.listAliases();
-    return result.data ?? [];
+    return this.soarService.listAliases();
   }
 
   // ══════════════════════════════════════════════════
@@ -215,14 +219,19 @@ export class SoarController {
   // ══════════════════════════════════════════════════
 
   @Get('actions')
-  @ApiOperation({ summary: 'List all SOAR actions (block/unblock/isolate) with undo support' })
+  @ApiOperation({
+    summary: 'List all SOAR actions (block/unblock/isolate) with undo support',
+  })
   async listActions(@Query('incident_id') incidentId?: string) {
     return this.soarService.listActions(incidentId);
   }
 
   @Post('actions/:id/undo')
+  @Roles(UserRole.ANALYST, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Undo a SOAR action (unblock IP or un-isolate host)' })
+  @ApiOperation({
+    summary: 'Undo a SOAR action (unblock IP or un-isolate host, ANALYST+)',
+  })
   async undoAction(@Param('id') id: string) {
     return this.soarService.undoAction(id);
   }
@@ -233,20 +242,6 @@ export class SoarController {
     description: 'Firewall provider status with version, rules count, etc.',
   })
   async getStatus() {
-    return this.agent.healthCheck();
-  }
-
-  // ══════════════════════════════════════════════════
-  //  Helpers
-  // ══════════════════════════════════════════════════
-
-  private ensurePfSense(operation: string): void {
-    if (this.agent.provider !== 'pfsense') {
-      throw new BadRequestException(
-        `Cannot ${operation}: this operation requires the pfSense firewall provider. ` +
-          `Current provider: ${this.agent.provider}. ` +
-          `Set SOAR_FIREWALL_PROVIDER=pfsense in your environment.`,
-      );
-    }
+    return this.soarService.firewallHealth();
   }
 }

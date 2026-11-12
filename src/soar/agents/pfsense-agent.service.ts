@@ -242,8 +242,6 @@ export class PfSenseAgentService implements IFirewallAgent {
     });
   }
 
-
-
   // ══════════════════════════════════════════════════
   //  IFirewallAgent — checkIp
   // ══════════════════════════════════════════════════
@@ -447,13 +445,21 @@ export class PfSenseAgentService implements IFirewallAgent {
   async listAliases(): Promise<PfSenseResponse<PfSenseAlias[]>> {
     const result = await this.get<any>('/api/v2/firewall/aliases');
     // pfSense API wraps the array in a nested data field
-    if (result.status === 'ok' && result.data && Array.isArray(result.data.data)) {
+    if (
+      result.status === 'ok' &&
+      result.data &&
+      Array.isArray(result.data.data)
+    ) {
       return { status: 'ok', data: result.data.data as PfSenseAlias[] };
     }
     if (result.status === 'ok' && Array.isArray(result.data)) {
       return { status: 'ok', data: result.data as PfSenseAlias[] };
     }
-    return { status: 'error', data: [], message: 'Unexpected alias list format' };
+    return {
+      status: 'error',
+      data: [],
+      message: 'Unexpected alias list format',
+    };
   }
 
   // ══════════════════════════════════════════════════
@@ -470,7 +476,9 @@ export class PfSenseAgentService implements IFirewallAgent {
     reason: string,
   ): Promise<void> {
     const allResult = await this.listAliases();
-    const alias = (allResult.data ?? []).find((a: PfSenseAlias) => a.name === aliasName);
+    const alias = (allResult.data ?? []).find(
+      (a: PfSenseAlias) => a.name === aliasName,
+    );
 
     if (alias) {
       const currentAddresses: string[] = alias.addresses ?? [];
@@ -479,7 +487,9 @@ export class PfSenseAgentService implements IFirewallAgent {
         return;
       }
       // Delete existing alias (pfSense API doesn't support update)
-      await this.del(`/api/v2/firewall/alias?id=${encodeURIComponent(alias.id)}`).catch(() => {});
+      await this.del(
+        `/api/v2/firewall/alias?id=${encodeURIComponent(alias.id)}`,
+      ).catch(() => {});
     }
 
     // Build final list: existing IPs (minus deleted) + new IP
@@ -502,8 +512,12 @@ export class PfSenseAgentService implements IFirewallAgent {
     });
 
     if (createResult.status !== 'ok') {
-      this.logger.error(`[pfSense] Failed to create alias "${aliasName}": ${createResult.message}`);
-      throw new Error(`Failed to update alias "${aliasName}": ${createResult.message}`);
+      this.logger.error(
+        `[pfSense] Failed to create alias "${aliasName}": ${createResult.message}`,
+      );
+      throw new Error(
+        `Failed to update alias "${aliasName}": ${createResult.message}`,
+      );
     }
 
     await this.applyChanges();
@@ -517,9 +531,13 @@ export class PfSenseAgentService implements IFirewallAgent {
     ip: string,
   ): Promise<void> {
     const allResult = await this.listAliases();
-    const alias = (allResult.data ?? []).find((a: PfSenseAlias) => a.name === aliasName);
+    const alias = (allResult.data ?? []).find(
+      (a: PfSenseAlias) => a.name === aliasName,
+    );
     if (!alias) {
-      this.logger.log(`[pfSense] Alias "${aliasName}" not found, nothing to remove`);
+      this.logger.log(
+        `[pfSense] Alias "${aliasName}" not found, nothing to remove`,
+      );
       return;
     }
     const currentAddresses: string[] = alias.addresses ?? [];
@@ -532,7 +550,9 @@ export class PfSenseAgentService implements IFirewallAgent {
     const addresses = currentAddresses.filter((a) => a !== ip);
 
     // Delete and recreate
-    await this.del(`/api/v2/firewall/alias?id=${encodeURIComponent(alias.id)}`).catch(() => {});
+    await this.del(
+      `/api/v2/firewall/alias?id=${encodeURIComponent(alias.id)}`,
+    ).catch(() => {});
 
     const createResult = await this.post('/api/v2/firewall/alias', {
       name: aliasName,

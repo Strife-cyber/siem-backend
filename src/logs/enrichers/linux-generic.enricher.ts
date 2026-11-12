@@ -14,12 +14,20 @@ export function parseLinuxGeneric(
   const lower = raw.toLowerCase();
 
   // SSH/pam auth messages
-  if (lower.includes('sshd') || lower.includes('pam_') || lower.includes('sudo:')) {
+  if (
+    lower.includes('sshd') ||
+    lower.includes('pam_') ||
+    lower.includes('sudo:')
+  ) {
     return parseLinuxAuth(raw, log);
   }
 
   // Firewall-like messages (iptables, nftables, etc.)
-  if (lower.includes('iptables') || lower.includes('nftables') || lower.includes('firewall')) {
+  if (
+    lower.includes('iptables') ||
+    lower.includes('nftables') ||
+    lower.includes('firewall')
+  ) {
     return parseFirewall(raw, log);
   }
 

@@ -13,9 +13,8 @@ interface UebaBatchJob {
   logs: NormalizedLog[];
 }
 
-interface UebaBaselineJob {
-  // empty — triggers a full rebuild
-}
+// empty — triggers a full rebuild
+type UebaBaselineJob = Record<string, never>;
 
 @Processor('ueba', { concurrency: 5 })
 export class UebaProcessor extends WorkerHost {
@@ -28,7 +27,9 @@ export class UebaProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<UebaScoringJob | UebaBatchJob | UebaBaselineJob>): Promise<void> {
+  async process(
+    job: Job<UebaScoringJob | UebaBatchJob | UebaBaselineJob>,
+  ): Promise<void> {
     switch (job.name) {
       case 'score': {
         const { log } = job.data as UebaScoringJob;

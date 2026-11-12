@@ -8,13 +8,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { MfaService } from './mfa.service';
 import { MailModule } from '../mail/mail.module';
 import { AuditModule } from '../audit/audit.module';
+import { getJwtSecret } from './jwt-secret';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret:
-        process.env.JWT_SECRET || 'siem-jwt-secret-key-change-in-production',
+      secret: getJwtSecret(),
       signOptions: { expiresIn: '24h' },
     }),
     MailModule,

@@ -89,7 +89,9 @@ export class NotificationsProcessor extends WorkerHost {
         topRules,
       });
 
-      this.logger.log(`[Notifications] Daily digest sent: ${incidents.length} incidents`);
+      this.logger.log(
+        `[Notifications] Daily digest sent: ${incidents.length} incidents`,
+      );
     } catch (err: any) {
       this.logger.error(`[Notifications] Daily digest failed: ${err.message}`);
     }

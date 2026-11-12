@@ -84,7 +84,8 @@ export class LatexReportService {
   private readonly logger = new Logger(LatexReportService.name);
   private readonly reportsDir: string;
   private readonly latexDir: string;
-  private template: HandlebarsTemplateDelegate<ReportTemplateData> | null = null;
+  private template: HandlebarsTemplateDelegate<ReportTemplateData> | null =
+    null;
 
   constructor() {
     this.reportsDir =
@@ -111,9 +112,7 @@ export class LatexReportService {
       this.template = Handlebars.compile<ReportTemplateData>(source);
       this.logger.log('[LaTeX] Template compiled successfully');
     } catch (err: any) {
-      this.logger.error(
-        `[LaTeX] Failed to compile template: ${err.message}`,
-      );
+      this.logger.error(`[LaTeX] Failed to compile template: ${err.message}`);
     }
   }
 
@@ -150,21 +149,18 @@ export class LatexReportService {
     const threatTypes: Array<{ type: string; count: number }> =
       overview?.threat_types ?? [];
 
-    const total =
-      Object.values(severityDist).reduce((a, b) => a + b, 0) || 1;
+    const total = Object.values(severityDist).reduce((a, b) => a + b, 0) || 1;
 
-    const severityInfoPct = (
-      ((severityDist.INFO ?? 0) / total) *
-      100
-    ).toFixed(0);
+    const severityInfoPct = (((severityDist.INFO ?? 0) / total) * 100).toFixed(
+      0,
+    );
     const severityWarningPct = (
       ((severityDist.WARNING ?? 0) / total) *
       100
     ).toFixed(0);
-    const severityHighPct = (
-      ((severityDist.HIGH ?? 0) / total) *
-      100
-    ).toFixed(0);
+    const severityHighPct = (((severityDist.HIGH ?? 0) / total) * 100).toFixed(
+      0,
+    );
     const severityCriticalPct = (
       ((severityDist.CRITICAL ?? 0) / total) *
       100
@@ -176,9 +172,7 @@ export class LatexReportService {
       count: s.count,
     }));
     const topSourcesMax =
-      topSources4.length > 0
-        ? Math.max(...topSources4.map((s) => s.count))
-        : 1;
+      topSources4.length > 0 ? Math.max(...topSources4.map((s) => s.count)) : 1;
 
     // Threat types — take 4 max
     const threatTypes4 = threatTypes.slice(0, 4).map((t) => ({
@@ -212,9 +206,7 @@ export class LatexReportService {
     // Audit trails — take 20 max
     const auditRows = (auditTrails ?? []).slice(0, 20).map((a: any) => ({
       user_id: escapeLatex(a.user_id ?? '-'),
-      role: escapeLatex(
-        (a as any).user?.role ?? a.role ?? 'Analyste',
-      ),
+      role: escapeLatex(a.user?.role ?? a.role ?? 'Analyste'),
       action: escapeLatex(a.action ?? '-'),
     }));
 
@@ -308,9 +300,7 @@ export class LatexReportService {
       filename,
       size_bytes: stat.size,
       created_at: new Date().toISOString(),
-      expires_at: new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000,
-      ).toISOString(),
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
 
     this.logger.log(
@@ -326,15 +316,19 @@ export class LatexReportService {
   /** Run pdflatex on the .tex file in latexDir */
   private runPdflatex(texId: string): void {
     const texPath = path.join(this.latexDir, `${texId}.tex`);
-    const result = spawnSync('pdflatex', [
-      '-interaction=nonstopmode',
-      `-output-directory=${this.latexDir}`,
-      texPath,
-    ], {
-      timeout: 60_000,
-      maxBuffer: 2 * 1024 * 1024,
-      stdio: 'pipe',
-    });
+    const result = spawnSync(
+      'pdflatex',
+      [
+        '-interaction=nonstopmode',
+        `-output-directory=${this.latexDir}`,
+        texPath,
+      ],
+      {
+        timeout: 60_000,
+        maxBuffer: 2 * 1024 * 1024,
+        stdio: 'pipe',
+      },
+    );
 
     const output = result.stdout?.toString() ?? '';
     // Exit code ≠ 0 or fatal error → fail

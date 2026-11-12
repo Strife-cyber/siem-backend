@@ -11,7 +11,9 @@ export async function createAliasPlaybook(
   try {
     const result = await pfsense.createAlias(name, ips, description);
     if (result.status === 'ok') {
-      logger.warn(`[create_alias] Created alias "${name}" with ${ips.length} IPs`);
+      logger.warn(
+        `[create_alias] Created alias "${name}" with ${ips.length} IPs`,
+      );
       return { success: true, name };
     }
     logger.error(`[create_alias] Failed: ${result.message}`);

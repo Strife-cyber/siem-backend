@@ -1,7 +1,12 @@
 import { IsString, IsOptional, IsIn, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
-const VALID_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'FALSE_POSITIVE'] as const;
+const VALID_STATUSES = [
+  'OPEN',
+  'INVESTIGATING',
+  'RESOLVED',
+  'FALSE_POSITIVE',
+] as const;
 
 export class ListFlagsDto {
   @IsOptional()

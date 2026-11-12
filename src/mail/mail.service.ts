@@ -1,7 +1,5 @@
-
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import type Mail from 'nodemailer/lib/mailer';
 import * as handlebars from 'handlebars';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -9,7 +7,7 @@ import * as path from 'node:path';
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transporter: Mail | null = null;
+  private readonly transporter: nodemailer.Transporter | null = null;
   private readonly from: string;
   private readonly templates: Map<string, HandlebarsTemplateDelegate> =
     new Map();
@@ -69,6 +67,10 @@ export class MailService {
     }
   }
 
+  private formatRecipients(to: string | string[]): string {
+    return Array.isArray(to) ? to.join(', ') : to;
+  }
+
   async sendEmail(options: {
     to: string | string[];
     subject: string;
@@ -77,7 +79,7 @@ export class MailService {
   }): Promise<boolean> {
     if (!this.transporter) {
       this.logger.log(
-        `[Mail] [DRY-RUN] To: ${options.to} | Subject: ${options.subject}`,
+        `[Mail] [DRY-RUN] To: ${this.formatRecipients(options.to)} | Subject: ${options.subject}`,
       );
       return true;
     }
@@ -90,11 +92,13 @@ export class MailService {
         html: options.html,
         text: options.text,
       });
-      this.logger.log(`[Mail] Sent to ${options.to}: "${options.subject}"`);
+      this.logger.log(
+        `[Mail] Sent to ${this.formatRecipients(options.to)}: "${options.subject}"`,
+      );
       return true;
     } catch (err: any) {
       this.logger.error(
-        `[Mail] Failed to send to ${options.to}: ${err.message}`,
+        `[Mail] Failed to send to ${this.formatRecipients(options.to)}: ${err.message}`,
       );
       return false;
     }
@@ -109,7 +113,7 @@ export class MailService {
   }): Promise<boolean> {
     if (!this.transporter) {
       this.logger.log(
-        `[Mail] [DRY-RUN] To: ${options.to} | Subject: ${options.subject} | Attachment: ${options.attachment.filename}`,
+        `[Mail] [DRY-RUN] To: ${this.formatRecipients(options.to)} | Subject: ${options.subject} | Attachment: ${options.attachment.filename}`,
       );
       return true;
     }
@@ -128,12 +132,12 @@ export class MailService {
         ],
       });
       this.logger.log(
-        `[Mail] Sent to ${options.to}: "${options.subject}" (attachment: ${options.attachment.filename})`,
+        `[Mail] Sent to ${this.formatRecipients(options.to)}: "${options.subject}" (attachment: ${options.attachment.filename})`,
       );
       return true;
     } catch (err: any) {
       this.logger.error(
-        `[Mail] Failed to send to ${options.to}: ${err.message}`,
+        `[Mail] Failed to send to ${this.formatRecipients(options.to)}: ${err.message}`,
       );
       return false;
     }
@@ -180,8 +184,12 @@ export class MailService {
 
     // Format time nicely
     const timeStr = incident.triggered_at.toLocaleString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       timeZoneName: 'short',
     });
 
