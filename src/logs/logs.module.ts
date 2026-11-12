@@ -16,11 +16,7 @@ import { LogsRetentionService } from './logs-retention.service';
     }),
   ],
   controllers: [LogsController],
-  providers: [
-    LogsService,
-    LogsProcessor,
-    LogsRetentionService,
-  ],
+  providers: [LogsService, LogsProcessor, LogsRetentionService],
 })
 export class LogsModule implements OnModuleInit {
   private readonly logger = new Logger(LogsModule.name);
@@ -32,7 +28,9 @@ export class LogsModule implements OnModuleInit {
 
   async onModuleInit() {
     // Run daily at 02:30 UTC: archive logs older than 30 days, then purge.
-    await this.logsQueue.removeJobScheduler('logs-retention-archive').catch(() => {});
+    await this.logsQueue
+      .removeJobScheduler('logs-retention-archive')
+      .catch(() => {});
     await this.logsQueue.upsertJobScheduler(
       'logs-retention-archive',
       { pattern: '30 2 * * *' },

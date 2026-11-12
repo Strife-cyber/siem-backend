@@ -1,9 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   Inject,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client';
+import { ExecutionStatus, PlaybookMode } from '../../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { FIREWALL_AGENT } from './agents/firewall-agent.interface';
 import type { IFirewallAgent } from './agents/firewall-agent.interface';
@@ -17,6 +20,13 @@ import {
 } from './playbooks/aliases.playbook';
 import { checkIpPlaybook } from './playbooks/check-ip.playbook';
 import { PfSenseAgentService } from './agents/pfsense-agent.service';
+
+/** Sentinel incident id for direct firewall actions that have no incident. */
+const NO_INCIDENT = '00000000-0000-0000-0000-000000000000';
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 @Injectable()
 export class SoarService {
@@ -43,8 +53,12 @@ export class SoarService {
         incident_id: data.incident_id,
         playbook_name: data.playbook_name,
         mode: data.mode,
-        status: 'PENDING',
-      } as any,
+        status: ExecutionStatus.PENDING,
+        // Persist params so a later CONFIRM approval replays the same input
+        result_payload: data.params
+          ? ({ params: data.params } as Prisma.InputJsonValue)
+          : undefined,
+      },
     });
 
     // ── CONFIRM mode: pause and wait for analyst approval ──
@@ -56,46 +70,103 @@ export class SoarService {
     }
 
     // ── AUTO mode: execute immediately ──
-    let resultPayload: Record<string, unknown> = {};
+    return this.runAndRecord(
+      execution.id,
+      data.playbook_name,
+      data.incident_id,
+      data.params,
+    );
+  }
 
+  /**
+   * Runs a playbook and persists the outcome on the execution row.
+   * The returned status always reflects what actually happened:
+   * EXECUTED on success, FAILED on error or unknown playbook.
+   */
+  private async runAndRecord(
+    executionId: string,
+    playbookName: string,
+    incidentId: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ execution_id: string; status: ExecutionStatus }> {
     try {
-      resultPayload = await this.runPlaybook(
-        data.playbook_name,
-        data.incident_id,
-        data.params,
+      const resultPayload = await this.runPlaybook(
+        playbookName,
+        incidentId,
+        params,
+        executionId,
       );
 
+      const failed = this.playbookFailed(resultPayload);
+      const status = failed ? ExecutionStatus.FAILED : ExecutionStatus.EXECUTED;
+
       await this.prisma.playbookExecution.update({
-        where: { id: execution.id },
+        where: { id: executionId },
         data: {
-          status: 'EXECUTED',
+          status,
           executed_at: new Date(),
-          result_payload: resultPayload as any,
+          result_payload: resultPayload as Prisma.InputJsonValue,
         },
       });
 
-      this.logger.log(
-        `[SOAR] ${data.playbook_name} executed (${execution.id}): ${JSON.stringify(resultPayload)}`,
-      );
-    } catch (err: any) {
-      await this.prisma.playbookExecution.update({
-        where: { id: execution.id },
-        data: {
-          status: 'FAILED',
-          executed_at: new Date(),
-          result_payload: { error: err.message } as any,
-        },
-      });
-      this.logger.error(`[SOAR] ${data.playbook_name} FAILED: ${err.message}`);
+      if (failed) {
+        this.logger.error(
+          `[SOAR] ${playbookName} FAILED: ${JSON.stringify(resultPayload)}`,
+        );
+      } else {
+        this.logger.log(
+          `[SOAR] ${playbookName} executed (${executionId}): ${JSON.stringify(resultPayload)}`,
+        );
+      }
+
+      return { execution_id: executionId, status };
+    } catch (err) {
+      const message = errorMessage(err);
+      try {
+        await this.prisma.playbookExecution.update({
+          where: { id: executionId },
+          data: {
+            status: ExecutionStatus.FAILED,
+            executed_at: new Date(),
+            result_payload: { error: message },
+          },
+        });
+      } catch (updateErr) {
+        this.logger.error(
+          `[SOAR] Could not persist FAILED status for execution ${executionId}: ${errorMessage(updateErr)}`,
+        );
+      }
+      this.logger.error(`[SOAR] ${playbookName} FAILED: ${message}`);
+      return { execution_id: executionId, status: ExecutionStatus.FAILED };
     }
+  }
 
-    return { execution_id: execution.id, status: 'EXECUTED' };
+  /**
+   * Playbooks report failures in several shapes: `{ error }` for unknown
+   * playbooks, `{ success: false }` from alias playbooks, and
+   * `{ blocked|isolated: [], failed: [...] }` when every target failed.
+   * Partial failures (some targets succeeded) still count as executed —
+   * the payload records which targets failed.
+   */
+  private playbookFailed(payload: Record<string, unknown>): boolean {
+    if (typeof payload.error === 'string') return true;
+    if (payload.success === false) return true;
+
+    const failed = Array.isArray(payload.failed) ? payload.failed.length : 0;
+    if (failed === 0) return false;
+
+    const anySucceeded = ['blocked', 'isolated'].some((key) => {
+      const value = payload[key];
+      return Array.isArray(value) && value.length > 0;
+    });
+    return !anySucceeded;
   }
 
   private async runPlaybook(
     playbookName: string,
     incidentId: string,
     params?: Record<string, unknown>,
+    executionId?: string,
   ): Promise<Record<string, unknown>> {
     const entities = await this.getIncidentEntities(incidentId);
     const ips: string[] = entities?.ips ?? [];
@@ -119,15 +190,29 @@ export class SoarService {
           this.logger,
         );
         // Record each blocked IP as a SoarAction
-        const blocked = ((result as any)?.blocked ?? []) as string[];
-        for (const ip of blocked) {
-          await this.recordAction(incidentId, 'block_ip', ip, result as any).catch(() => {});
+        for (const ip of result.blocked) {
+          await this.recordAction(
+            incidentId,
+            executionId,
+            'block_ip',
+            ip,
+            result,
+          ).catch((err) =>
+            this.logger.warn(
+              `[SOAR] Failed to record block_ip action for ${ip}: ${errorMessage(err)}`,
+            ),
+          );
         }
         // Auto-resolve incident if IPs were blocked
-        if (blocked.length > 0) {
-          await this.autoResolveIncident(incidentId, playbookName).catch(() => {});
+        if (result.blocked.length > 0) {
+          await this.autoResolveIncident(incidentId, playbookName).catch(
+            (err) =>
+              this.logger.warn(
+                `[SOAR] Failed to auto-resolve incident ${incidentId}: ${errorMessage(err)}`,
+              ),
+          );
         }
-        return result as any;
+        return result;
       }
 
       case 'isolate_endpoint': {
@@ -139,27 +224,28 @@ export class SoarService {
           'Suspicious host detected',
           this.logger,
         );
-        // Record each isolated host as a SoarAction
-        const isolated = ((result as any)?.isolated ?? []) as string[];
-        for (const host of isolated) {
-          await this.recordAction(incidentId, 'isolate_host', host, result as any).catch(() => {});
+        for (const host of result.isolated) {
+          await this.recordAction(
+            incidentId,
+            executionId,
+            'isolate_host',
+            host,
+            result,
+          ).catch((err) =>
+            this.logger.warn(
+              `[SOAR] Failed to record isolate_host action for ${host}: ${errorMessage(err)}`,
+            ),
+          );
         }
-        if (isolated.length > 0) {
-          await this.autoResolveIncident(incidentId, playbookName).catch(() => {});
+        if (result.isolated.length > 0) {
+          await this.autoResolveIncident(incidentId, playbookName).catch(
+            (err) =>
+              this.logger.warn(
+                `[SOAR] Failed to auto-resolve incident ${incidentId}: ${errorMessage(err)}`,
+              ),
+          );
         }
-        return result as any;
-      }
-
-      case 'isolate_endpoint': {
-        if (hosts.length === 0)
-          return { skipped: true, reason: 'no hosts to isolate' };
-        const result = await isolateHostPlaybook(
-          this.agent,
-          hosts,
-          'Suspicious host detected',
-          this.logger,
-        );
-        return result as any;
+        return result;
       }
 
       case 'disable_account': {
@@ -181,7 +267,7 @@ export class SoarService {
           (params?.reason as string) ?? 'Attack detected on port',
           this.logger,
         );
-        return result as any;
+        return result;
       }
 
       case 'temporary_block': {
@@ -197,7 +283,7 @@ export class SoarService {
           incidentId,
           this.logger,
         );
-        return result as any;
+        return result;
       }
 
       case 'remove_rule': {
@@ -209,7 +295,7 @@ export class SoarService {
           // New path: unblock by IP (provider-agnostic)
           const result = await this.agent.unblockIp(ip);
           this.logger.warn(`[remove_rule] Unblocked IP ${ip}`);
-          return { ip, status: 'ok', ...result } as any;
+          return { ip, status: 'ok', ...result };
         }
 
         if (legacyRuleId && this.agent.provider === 'pfsense') {
@@ -235,8 +321,7 @@ export class SoarService {
             reason: 'Aliases require the pfSense firewall provider',
           };
         }
-        const name =
-          (params?.name as string) ?? `siem-blocked-${Date.now()}`;
+        const name = (params?.name as string) ?? `siem-blocked-${Date.now()}`;
         if (ips.length === 0) return { skipped: true, reason: 'no IPs' };
         const pfsense = this.agent as unknown as PfSenseAgentService;
         const aliasResult = await createAliasPlaybook(
@@ -246,7 +331,7 @@ export class SoarService {
           (params?.description as string) ?? 'Blocked by Smart SIEM',
           this.logger,
         );
-        return aliasResult as any;
+        return aliasResult;
       }
 
       case 'delete_alias': {
@@ -264,7 +349,7 @@ export class SoarService {
           aliasName,
           this.logger,
         );
-        return delResult as any;
+        return delResult;
       }
 
       case 'check_ip': {
@@ -275,7 +360,7 @@ export class SoarService {
           checkIp,
           this.logger,
         );
-        return checkResult as any;
+        return { blocked: checkResult.blocked, rules: checkResult.rules };
       }
 
       case 'notify_teams': {
@@ -297,9 +382,15 @@ export class SoarService {
   } | null> {
     const incident = await this.prisma.incident.findUnique({
       where: { id: incidentId },
-      select: { related_entities: true, summary: true },
+      select: { related_entities: true },
     });
-    return (incident?.related_entities as any) ?? null;
+    return (
+      (incident?.related_entities as {
+        ips?: string[];
+        hosts?: string[];
+        users?: string[];
+      } | null) ?? null
+    );
   }
 
   // ══════════════════════════════════════════════════
@@ -311,27 +402,23 @@ export class SoarService {
    */
   private async recordAction(
     incidentId: string,
+    executionId: string | undefined,
     actionType: string,
     target: string,
     resultPayload: Record<string, unknown>,
   ): Promise<void> {
-    const execution = await this.prisma.playbookExecution.findFirst({
-      where: { incident_id: incidentId },
-      orderBy: { initiated_at: 'desc' },
-      select: { id: true },
+    await this.prisma.soarAction.create({
+      data: {
+        incident_id: incidentId,
+        execution_id: executionId ?? null,
+        action_type: actionType,
+        target,
+        status: 'EXECUTED',
+        provider: this.agent.provider,
+        description: `Action: ${actionType} on ${target}`,
+        result_payload: resultPayload as Prisma.InputJsonValue,
+      },
     });
-
-    await this.prisma.$executeRawUnsafe(
-      'INSERT INTO soar_actions (id, incident_id, execution_id, action_type, target, status, provider, description, result_payload) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)',
-      incidentId,
-      execution?.id ?? null,
-      actionType,
-      target,
-      'EXECUTED',
-      this.agent.provider,
-      `Action: ${actionType} on ${target}`,
-      JSON.stringify(resultPayload),
-    );
   }
 
   /**
@@ -354,7 +441,7 @@ export class SoarService {
       );
     } catch (err: any) {
       this.logger.warn(
-        `[SOAR] Failed to auto-resolve incident ${incidentId}: ${err.message}`,
+        `[SOAR] Failed to auto-resolve incident ${incidentId}: ${errorMessage(err)}`,
       );
     }
   }
@@ -363,30 +450,24 @@ export class SoarService {
    * List all SOAR actions, with optional filter by incident.
    */
   async listActions(incidentId?: string) {
-    if (incidentId) {
-      return this.prisma.$queryRawUnsafe(
-        'SELECT id, incident_id, execution_id, action_type, target, status, provider, description, created_at, reverted_at FROM soar_actions WHERE incident_id = $1 ORDER BY created_at DESC',
-        incidentId,
-      );
-    }
-    return this.prisma.$queryRawUnsafe(
-      'SELECT id, incident_id, execution_id, action_type, target, status, provider, description, created_at, reverted_at FROM soar_actions ORDER BY created_at DESC LIMIT 100',
-    );
+    return this.prisma.soarAction.findMany({
+      where: incidentId ? { incident_id: incidentId } : undefined,
+      orderBy: { created_at: 'desc' },
+      take: incidentId ? undefined : 100,
+    });
   }
 
   /**
    * Undo a SOAR action: reverse the firewall operation.
    */
   async undoAction(actionId: string): Promise<Record<string, unknown>> {
-    const action = await this.prisma.$queryRawUnsafe<
-      Array<Record<string, unknown>>
-    >('SELECT * FROM soar_actions WHERE id = $1', actionId);
+    const act = await this.prisma.soarAction.findUnique({
+      where: { id: actionId },
+    });
 
-    if (!action || (action as any[]).length === 0) {
+    if (!act) {
       throw new NotFoundException('SOAR action not found');
     }
-
-    const act = (action as any[])[0];
 
     if (act.status === 'REVERTED') {
       return { error: 'Action already reverted', action_id: actionId };
@@ -397,23 +478,19 @@ export class SoarService {
     try {
       switch (act.action_type) {
         case 'block_ip':
-          reverseResult = (await this.agent.unblockIp(act.target)) as any;
+          reverseResult = await this.agent.unblockIp(act.target);
           break;
         case 'isolate_host':
-          if ('unIsolateHost' in this.agent) {
-            reverseResult = (await (
-              this.agent as any
-            ).unIsolateHost(act.target)) as any;
-          }
+          reverseResult = await this.agent.unIsolateHost(act.target);
           break;
         default:
           return { error: `Cannot undo action type: ${act.action_type}` };
       }
 
-      await this.prisma.$executeRawUnsafe(
-        "UPDATE soar_actions SET status = 'REVERTED', reverted_at = NOW() WHERE id = $1",
-        actionId,
-      );
+      await this.prisma.soarAction.update({
+        where: { id: actionId },
+        data: { status: 'REVERTED', reverted_at: new Date() },
+      });
 
       this.logger.warn(
         `[SOAR] Undid action ${actionId}: ${act.action_type} on ${act.target}`,
@@ -426,8 +503,8 @@ export class SoarService {
         status: 'REVERTED',
         reverse_result: reverseResult,
       };
-    } catch (err: any) {
-      return { error: err.message, action_id: actionId };
+    } catch (err) {
+      return { error: errorMessage(err), action_id: actionId };
     }
   }
 
@@ -442,7 +519,13 @@ export class SoarService {
     // Try new format (ip-based)
     const ip = payload?.ip as string | undefined;
     if (typeof ip === 'string' && this.agent.isConfigured) {
-      await this.agent.unblockIp(ip).catch(() => {});
+      await this.agent
+        .unblockIp(ip)
+        .catch((err) =>
+          this.logger.warn(
+            `[SOAR] Failed to unblock ${ip} while aborting ${executionId}: ${errorMessage(err)}`,
+          ),
+        );
     } else {
       // Legacy format (pfSense-specific rule ID)
       const legacyRuleId = payload?.pfSenseRuleId as string | undefined;
@@ -451,13 +534,19 @@ export class SoarService {
         this.agent.provider === 'pfsense'
       ) {
         const pfsense = this.agent as unknown as PfSenseAgentService;
-        await pfsense.unblockIP_deprecated(legacyRuleId).catch(() => {});
+        await pfsense
+          .unblockIP_deprecated(legacyRuleId)
+          .catch((err) =>
+            this.logger.warn(
+              `[SOAR] Failed to delete legacy rule ${legacyRuleId} while aborting ${executionId}: ${errorMessage(err)}`,
+            ),
+          );
       }
     }
 
     await this.prisma.playbookExecution.update({
       where: { id: executionId },
-      data: { status: 'ABORTED' },
+      data: { status: ExecutionStatus.ABORTED },
     });
     return { status: 'aborted' };
   }
@@ -469,9 +558,16 @@ export class SoarService {
   /** List all PENDING playbook executions awaiting analyst approval */
   async getPendingExecutions() {
     return this.prisma.playbookExecution.findMany({
-      where: { status: 'PENDING', mode: 'CONFIRM' },
+      where: { status: ExecutionStatus.PENDING, mode: PlaybookMode.CONFIRM },
       include: {
-        incident: { select: { id: true, severity: true, summary: true, triggered_at: true } },
+        incident: {
+          select: {
+            id: true,
+            severity: true,
+            summary: true,
+            triggered_at: true,
+          },
+        },
       },
       orderBy: { initiated_at: 'desc' },
     });
@@ -486,54 +582,121 @@ export class SoarService {
       where: { id: executionId },
     });
     if (!execution) throw new NotFoundException('Execution not found');
-    if (execution.status !== 'PENDING') {
-      throw new NotFoundException(
+    if (execution.status !== ExecutionStatus.PENDING) {
+      throw new BadRequestException(
         `Execution ${executionId} is ${execution.status}, not PENDING`,
       );
     }
-    if (execution.mode !== 'CONFIRM') {
-      throw new NotFoundException(
+    if (execution.mode !== PlaybookMode.CONFIRM) {
+      throw new BadRequestException(
         `Execution ${executionId} is in ${execution.mode} mode, not CONFIRM`,
       );
     }
 
-    const payload = execution.result_payload as Record<string, unknown> | undefined;
+    // Params are persisted at creation time (see executePlaybook)
+    const payload = execution.result_payload as {
+      params?: Record<string, unknown>;
+    } | null;
 
-    let resultPayload: Record<string, unknown> = {};
+    return this.runAndRecord(
+      executionId,
+      execution.playbook_name,
+      execution.incident_id,
+      payload?.params,
+    );
+  }
 
-    try {
-      resultPayload = await this.runPlaybook(
-        execution.playbook_name,
-        execution.incident_id,
-        payload?.params as Record<string, unknown> | undefined,
-      );
+  // ══════════════════════════════════════════════════
+  //  Direct firewall actions (provider-agnostic)
+  // ══════════════════════════════════════════════════
 
-      await this.prisma.playbookExecution.update({
-        where: { id: executionId },
-        data: {
-          status: 'EXECUTED',
-          executed_at: new Date(),
-          result_payload: resultPayload as any,
-        },
-      });
+  async directBlockIp(ip: string, reason?: string) {
+    return blockIpPlaybook(
+      this.agent,
+      [ip],
+      reason ?? 'Manual block',
+      this.logger,
+    );
+  }
 
-      this.logger.warn(
-        `[SOAR] CONFIRM approved — ${execution.playbook_name} executed (${executionId})`,
-      );
-    } catch (err: any) {
-      await this.prisma.playbookExecution.update({
-        where: { id: executionId },
-        data: {
-          status: 'FAILED',
-          executed_at: new Date(),
-          result_payload: { error: err.message } as any,
-        },
-      });
-      this.logger.error(
-        `[SOAR] CONFIRM approved — ${execution.playbook_name} FAILED: ${err.message}`,
+  async directBlockPort(
+    ip: string,
+    port: number,
+    protocol: 'tcp' | 'udp',
+    reason?: string,
+  ) {
+    return blockPortPlaybook(
+      this.agent,
+      [{ ip, port, protocol }],
+      reason ?? 'Manual port block',
+      this.logger,
+    );
+  }
+
+  async directTemporaryBlock(ip: string, ttlSeconds: number, reason?: string) {
+    return temporaryBlockPlaybook(
+      this.agent,
+      undefined,
+      [ip],
+      reason ?? 'Temporary manual block',
+      ttlSeconds,
+      NO_INCIDENT,
+      this.logger,
+    );
+  }
+
+  async checkIp(ip: string) {
+    return checkIpPlaybook(this.agent, ip, this.logger);
+  }
+
+  async unblockIp(ip: string) {
+    return this.agent.unblockIp(ip);
+  }
+
+  async listFirewallRules() {
+    return this.agent.listRules();
+  }
+
+  async deleteFirewallRule(name: string) {
+    return this.agent.deleteRule(name);
+  }
+
+  async firewallHealth() {
+    return this.agent.healthCheck();
+  }
+
+  async createAlias(name: string, addresses: string[], description?: string) {
+    this.ensurePfSense('create aliases');
+    const pfsense = this.agent as unknown as PfSenseAgentService;
+    return createAliasPlaybook(
+      pfsense,
+      name,
+      addresses,
+      description ?? 'Smart SIEM alias',
+      this.logger,
+    );
+  }
+
+  async deleteAlias(id: string) {
+    this.ensurePfSense('delete aliases');
+    const pfsense = this.agent as unknown as PfSenseAgentService;
+    return deleteAliasPlaybook(pfsense, id, this.logger);
+  }
+
+  async listAliases() {
+    this.ensurePfSense('list aliases');
+    const pfsense = this.agent as unknown as PfSenseAgentService;
+    const result = await pfsense.listAliases();
+    return result.data ?? [];
+  }
+
+  private ensurePfSense(operation: string): void {
+    if (this.agent.provider !== 'pfsense') {
+      throw new BadRequestException(
+        `Cannot ${operation}: this operation requires the pfSense firewall provider. ` +
+          `Current provider: ${this.agent.provider}. ` +
+          `Set SOAR_FIREWALL_PROVIDER=pfsense in your environment.`,
       );
     }
-
-    return { execution_id: executionId, status: 'EXECUTED' };
   }
 }

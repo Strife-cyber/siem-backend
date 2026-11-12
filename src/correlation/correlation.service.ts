@@ -253,8 +253,12 @@ export class CorrelationService {
         this.uebaQueue.getWaitingCount(),
         this.reportsQueue.getDelayedCount(),
       ]);
-      this.logger.log(`  [QUEUES] logs(w:${lW} a:${lA} d:${lD} f:${lF} ✓:${lC}) | notifs:${nW} | ueba:${uW} | reports:${rD}`);
-    } catch { /* non-critical */ }
+      this.logger.log(
+        `  [QUEUES] logs(w:${lW} a:${lA} d:${lD} f:${lF} ✓:${lC}) | notifs:${nW} | ueba:${uW} | reports:${rD}`,
+      );
+    } catch {
+      /* non-critical */
+    }
 
     this.logger.log('====================');
 
@@ -333,32 +337,42 @@ export class CorrelationService {
         : await this.fetchMatchingEventsFromEs(result, definition);
 
       if (events.length === 0) {
-        this.logger.log(`  [EVENTS] No matching events to store for incident ${incidentId}`);
+        this.logger.log(
+          `  [EVENTS] No matching events to store for incident ${incidentId}`,
+        );
         return;
       }
 
-      // Insert events via raw SQL (Prisma 7.x client may not expose incidentEvent delegate)
-      for (const e of events) {
+      // collected_at is NOT NULL — skip events without a timestamp
+      const storable = events.filter((e) => e.collected_at);
+      let stored = 0;
+      for (const e of storable) {
         try {
-          await this.prisma.$executeRawUnsafe(
-            'INSERT INTO incident_events (id, incident_id, es_id, collected_at, source_ip, destination_ip, hostname, user_principal, action, outcome, source_type, raw_message) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT DO NOTHING',
-            incidentId,
-            e.es_id ?? null,
-            e.collected_at ? new Date(e.collected_at) : null,
-            e.source_ip ?? null,
-            e.destination_ip ?? null,
-            e.hostname ?? null,
-            e.user_principal ?? null,
-            e.action ?? null,
-            e.outcome ?? null,
-            e.source_type ?? null,
-            e.raw_message ?? null,
+          await this.prisma.incidentEvent.create({
+            data: {
+              incident_id: incidentId,
+              es_id: e.es_id ?? null,
+              collected_at: new Date(e.collected_at),
+              source_ip: e.source_ip ?? null,
+              destination_ip: e.destination_ip ?? null,
+              hostname: e.hostname ?? null,
+              user_principal: e.user_principal ?? null,
+              action: e.action ?? null,
+              outcome: e.outcome ?? null,
+              source_type: e.source_type ?? null,
+              raw_message: e.raw_message ?? null,
+            },
+          });
+          stored += 1;
+        } catch (err) {
+          this.logger.warn(
+            `  [EVENTS] Failed to store event ${e.es_id ?? '(no es_id)'} for incident ${incidentId}: ${err instanceof Error ? err.message : String(err)}`,
           );
-        } catch { /* skip individual insert errors */ }
+        }
       }
 
       this.logger.log(
-        `  [EVENTS] Stored ${events.length} matching event(s) for incident ${incidentId}`,
+        `  [EVENTS] Stored ${stored}/${events.length} matching event(s) for incident ${incidentId}`,
       );
     } catch (error: any) {
       // Non-blocking: event storage failure shouldn't prevent incident creation
@@ -375,7 +389,9 @@ export class CorrelationService {
   private async fetchMatchingEventsFromEs(
     result: DetectionResult,
     definition?: import('./interfaces/detection-rule.interface').RuleDefinition,
-  ): Promise<import('./interfaces/detection-rule.interface').IncidentEventPayload[]> {
+  ): Promise<
+    import('./interfaces/detection-rule.interface').IncidentEventPayload[]
+  > {
     if (!definition) return [];
 
     const filter: Record<string, unknown>[] = [];
@@ -444,7 +460,7 @@ export class CorrelationService {
     return hits.map((hit: any) => ({
       es_id: hit._id,
       ...(hit._source as Record<string, unknown>),
-    })) as any;
+    }));
   }
 
   private async findRecentDuplicate(result: DetectionResult): Promise<boolean> {

@@ -45,13 +45,24 @@ export class IncidentsService {
     });
     if (!incident) throw new NotFoundException('Incident not found');
 
-    // Fetch incident events via raw SQL (Prisma client may not have IncidentEvent model)
-    const events = await this.prisma.$queryRawUnsafe<
-      Array<Record<string, unknown>>
-    >(
-      'SELECT id, es_id, collected_at, source_ip, destination_ip, hostname, user_principal, action, outcome, source_type, raw_message FROM incident_events WHERE incident_id = $1 ORDER BY collected_at DESC LIMIT 200',
-      id,
-    );
+    const events = await this.prisma.incidentEvent.findMany({
+      where: { incident_id: id },
+      orderBy: { collected_at: 'desc' },
+      take: 200,
+      select: {
+        id: true,
+        es_id: true,
+        collected_at: true,
+        source_ip: true,
+        destination_ip: true,
+        hostname: true,
+        user_principal: true,
+        action: true,
+        outcome: true,
+        source_type: true,
+        raw_message: true,
+      },
+    });
 
     // Audit: log incident consultation
     if (actingUserId) {

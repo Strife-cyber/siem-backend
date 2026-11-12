@@ -61,7 +61,11 @@ export class AdminService {
     await this.audit.log({
       userId: actingUserId,
       action: 'USER_CREATED',
-      metadata: { target_user: user.id, target_username: user.username, role: user.role },
+      metadata: {
+        target_user: user.id,
+        target_username: user.username,
+        role: user.role,
+      },
     });
 
     return user;
@@ -95,7 +99,11 @@ export class AdminService {
       await this.audit.log({
         userId: actingUserId,
         action: 'USER_UPDATED',
-        metadata: { target_user: id, target_username: user.username, ...changes },
+        metadata: {
+          target_user: id,
+          target_username: user.username,
+          ...changes,
+        },
       });
     }
 

@@ -39,7 +39,9 @@ export class MfaService {
 
     // Send email (non-blocking)
     this.mail.sendMfaCode(user.email, code, user.username).catch((err) => {
-      this.logger.error(`[MFA] Failed to send email to ${user.email}: ${err.message}`);
+      this.logger.error(
+        `[MFA] Failed to send email to ${user.email}: ${err.message}`,
+      );
     });
 
     this.logger.log(`[MFA] OTP sent to ${user.email} (session: ${session.id})`);
@@ -82,7 +84,9 @@ export class MfaService {
   async enableMfa(userId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.email) {
-      throw new UnauthorizedException('Set an email address first before enabling MFA');
+      throw new UnauthorizedException(
+        'Set an email address first before enabling MFA',
+      );
     }
     await this.prisma.user.update({
       where: { id: userId },

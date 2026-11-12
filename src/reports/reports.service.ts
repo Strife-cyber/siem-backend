@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { ElasticsearchService } from '../elasticsearch/elasticsearch.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DashboardService } from '../dashboard/dashboard.service';
@@ -37,7 +36,10 @@ export class ReportsService {
     // Fire and forget — generate in background
     this.doGenerate(jobId, request).catch((err) => {
       this.logger.error(`Report generation failed: ${err.message}`);
-      this.pendingJobs.set(jobId, { status: 'failed', error: err.message ?? String(err) });
+      this.pendingJobs.set(jobId, {
+        status: 'failed',
+        error: err.message ?? String(err),
+      });
     });
 
     return { job_id: jobId, status: 'generating' };
@@ -106,7 +108,9 @@ export class ReportsService {
     }
   }
 
-  getJobStatus(jobId: string): { status: string; meta?: ReportMeta; error?: string } | null {
+  getJobStatus(
+    jobId: string,
+  ): { status: string; meta?: ReportMeta; error?: string } | null {
     return this.pendingJobs.get(jobId) ?? null;
   }
 
@@ -151,7 +155,6 @@ export class ReportsService {
     }
 
     const period = `${request.start_date.slice(0, 10)} — ${request.end_date.slice(0, 10)}`;
-    const reportName = meta.filename.replace('.pdf', '');
 
     await this.mail.sendEmailWithAttachment({
       to: recipients,

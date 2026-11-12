@@ -4,7 +4,9 @@ import {
   IsEnum,
   IsOptional,
   IsInt,
+  IsObject,
   Min,
+  Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -33,6 +35,15 @@ export class PlaybookExecutionDto {
   @ApiProperty({ enum: ['AUTO', 'CONFIRM'] })
   @IsEnum(['AUTO', 'CONFIRM'] as const)
   mode!: 'AUTO' | 'CONFIRM';
+
+  @ApiPropertyOptional({
+    description:
+      'Optional playbook parameters (e.g. {"ip": "1.2.3.4", "port": 3389}). ' +
+      'Persisted on CONFIRM executions so approval replays the same input.',
+  })
+  @IsOptional()
+  @IsObject()
+  params?: Record<string, unknown>;
 }
 
 export class DirectBlockIpDto {
@@ -54,6 +65,7 @@ export class DirectBlockPortDto {
   @ApiProperty({ default: 3389 })
   @IsInt()
   @Min(1)
+  @Max(65535)
   port!: number;
 
   @ApiProperty({ enum: ['tcp', 'udp'] })

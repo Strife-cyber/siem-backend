@@ -35,10 +35,7 @@ export class FlaggedEventsController {
     summary: 'Flag a log event for cross-investigation (FR-06.3)',
   })
   @ApiCreatedResponse({ description: 'Event flagged successfully' })
-  async flag(
-    @Body() dto: FlagEventDto,
-    @CurrentUser('sub') userId: string,
-  ) {
+  async flag(@Body() dto: FlagEventDto, @CurrentUser('sub') userId: string) {
     return this.flaggedEventsService.flag(dto, userId);
   }
 

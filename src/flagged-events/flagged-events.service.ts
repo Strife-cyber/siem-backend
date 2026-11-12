@@ -32,7 +32,8 @@ export class FlaggedEventsService {
         where: { id: existing.id },
         data: {
           reason: dto.reason ?? existing.reason,
-          event_snapshot: (dto.event_snapshot ?? existing.event_snapshot) as any,
+          event_snapshot: (dto.event_snapshot ??
+            existing.event_snapshot) as any,
           status: 'OPEN',
         },
       });
@@ -146,11 +147,7 @@ export class FlaggedEventsService {
   /**
    * Link two flagged events together for cross-investigation.
    */
-  async link(
-    fromHash: string,
-    toHash: string,
-    userId: string,
-  ): Promise<void> {
+  async link(fromHash: string, toHash: string, _userId: string): Promise<void> {
     const from = await this.prisma.flaggedEvent.findUnique({
       where: { ingestion_hash: fromHash },
     });
