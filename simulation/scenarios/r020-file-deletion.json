@@ -1,0 +1,36 @@
+{
+  "name": "r020-file-deletion",
+  "description": "R020: 4663 DELETE access on Security.evtx. Expects R020 HIGH + isolate_endpoint CONFIRM.",
+  "base_time": "2026-11-12T13:35:00Z",
+  "requires_rules": [
+    "R020"
+  ],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "WIN-SRV-04",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4663</EventID></System><EventData><Data Name=\"SubjectUserName\">admin</Data><Data Name=\"AccessMask\">0x10000</Data><Data Name=\"ObjectName\">C:\\Windows\\System32\\winevt\\Logs\\Security.evtx</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R020",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_playbook_executions": [
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      }
+    ]
+  }
+}

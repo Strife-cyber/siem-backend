@@ -258,8 +258,174 @@ export class LateralMovementRule implements AttackCorrelationRule {
   }
 }
 
+interface SequenceStageConfig {
+  id: string;
+  name: string;
+  /** Ordered prerequisite rule-id stages; each must fire within WINDOW_MS of the previous. */
+  stages: string[][];
+  severity: 'INFO' | 'WARNING' | 'HIGH' | 'CRITICAL';
+  confidence: number;
+  summary: (chain: IncidentRow[]) => string;
+  response?: { playbook: string; mode: 'AUTO' | 'CONFIRM' };
+}
+
+function shareEntity(a: IncidentRow, b: IncidentRow): boolean {
+  const pairs: Array<[string[], string[]]> = [
+    [ipsOf(a), ipsOf(b)],
+    [hostsOf(a), hostsOf(b)],
+    [usersOf(a), usersOf(b)],
+  ];
+  return pairs.some(([x, y]) => x.length > 0 && y.length > 0 && overlap(x, y));
+}
+
+/**
+ * Generic multi-stage attack correlation: finds incident chains where each
+ * stage's rule fired after the previous one, within WINDOW_MS, sharing at
+ * least one entity (IP, host or user) with the accumulated chain.
+ */
+function sequenceCorrelation(cfg: SequenceStageConfig): AttackCorrelationRule {
+  return {
+    id: cfg.id,
+    name: cfg.name,
+    async detect(prisma: PrismaService, since: Date) {
+      const stageRules = cfg.stages.flat();
+      const incidents = await loadIncidents(prisma, since, stageRules);
+      const sorted = [...incidents].sort(
+        (a, b) => a.triggered_at.getTime() - b.triggered_at.getTime(),
+      );
+      const results: AttackCorrelationResult[] = [];
+      const fired = new Set<string>();
+
+      for (const start of sorted) {
+        if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
+        const chain: IncidentRow[] = [start];
+        let cursor = start;
+        let matched = true;
+
+        for (let s = 1; s < cfg.stages.length; s++) {
+          // Layer-1 incidents from the same correlation cycle have no
+          // guaranteed cross-rule ordering, so match on time proximity
+          // (either direction) rather than strict sequence timestamps.
+          const next = sorted.find(
+            (i) =>
+              cfg.stages[s].includes(i.rule_id ?? '') &&
+              Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) <=
+                WINDOW_MS &&
+              chain.every((c) => shareEntity(c, i)),
+          );
+          if (!next) {
+            matched = false;
+            break;
+          }
+          chain.push(next);
+          cursor = next;
+        }
+        if (!matched) continue;
+
+        const key = chain.map((c) => c.id).join('|');
+        if (fired.has(key)) continue;
+        fired.add(key);
+
+        const chainIps = [...new Set(chain.flatMap((c) => ipsOf(c)))];
+        const chainUsers = [...new Set(chain.flatMap((c) => usersOf(c)))];
+        const chainHosts = [...new Set(chain.flatMap((c) => hostsOf(c)))];
+        results.push({
+          rule_id: this.id,
+          rule_name: this.name,
+          severity: cfg.severity,
+          confidence_score: cfg.confidence,
+          summary: cfg.summary(chain),
+          related_entities: {
+            ips: chainIps,
+            users: chainUsers,
+            hosts: chainHosts,
+          },
+          prerequisite_incident_ids: chain.map((c) => c.id),
+          response: cfg.response,
+        });
+      }
+      return results;
+    },
+  };
+}
+
+/**
+ * C006 — Suspicious administrative account creation (spec §4, MITRE T1136+T1098+T1078)
+ * R010 (admin account created) followed by R008 (successful login after
+ * failures) for the same account/IP within 30 minutes → disable_account CONFIRM.
+ */
+const SuspiciousAdminAccountChainRule = sequenceCorrelation({
+  id: 'C006',
+  name: 'Suspicious Admin Account Creation Chain',
+  stages: [['R010'], ['R008']],
+  severity: 'HIGH',
+  confidence: 80,
+  summary: (chain) =>
+    `Attack sequence: privileged account creation (${chain[0].rule_id}) followed by ` +
+    `suspicious authentication (${chain[1].rule_id}) within 30 minutes`,
+  response: { playbook: 'disable_account', mode: 'CONFIRM' },
+});
+
+/**
+ * C007 — Malware execution followed by persistence (spec §4, MITRE T1059+T1053+T1543)
+ * R011 (suspicious PowerShell) followed by R015 (scheduled task) or R017
+ * (startup persistence) on the same host within 30 minutes → isolate CONFIRM.
+ */
+const MalwareToPersistenceRule = sequenceCorrelation({
+  id: 'C007',
+  name: 'Malware Execution to Persistence',
+  stages: [['R011'], ['R015', 'R017']],
+  severity: 'HIGH',
+  confidence: 85,
+  summary: (chain) =>
+    `Attack sequence: suspicious script execution (${chain[0].rule_id}) followed by ` +
+    `persistence mechanism (${chain[1].rule_id}) within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
+/**
+ * C008 — Credential theft followed by lateral movement (spec §4, MITRE T1003+T1078+T1550)
+ * R002 (pass-the-hash) followed by R022 (SMB lateral movement) from the same
+ * source IP within 30 minutes → isolate CONFIRM.
+ */
+const CredentialTheftToLateralRule = sequenceCorrelation({
+  id: 'C008',
+  name: 'Credential Theft to Lateral Movement',
+  stages: [['R002'], ['R022']],
+  severity: 'HIGH',
+  confidence: 85,
+  summary: (chain) =>
+    `Attack sequence: credential abuse (${chain[0].rule_id}) followed by SMB ` +
+    `lateral movement (${chain[1].rule_id}) within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
+/**
+ * C010 — Ransomware preparation and execution (spec §4, MITRE T1562+T1489+T1486)
+ * R018 (security tools disabled) followed by R020 (security-artifact deletion)
+ * on the same host within 30 minutes → CRITICAL, immediate isolation CONFIRM.
+ *
+ * Note: full ransomware staging (mass encryption) has no telemetry yet; this
+ * correlates the two provable precursor behaviors.
+ */
+const RansomwarePreparationRule = sequenceCorrelation({
+  id: 'C010',
+  name: 'Ransomware Preparation Chain',
+  stages: [['R018'], ['R020']],
+  severity: 'CRITICAL',
+  confidence: 88,
+  summary: (chain) =>
+    `Ransomware preparation: security monitoring disabled (${chain[0].rule_id}) ` +
+    `followed by artifact deletion (${chain[1].rule_id}) within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
 export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   new ReconToAccessRule(),
   new BruteForceToCompromiseRule(),
   new LateralMovementRule(),
+  SuspiciousAdminAccountChainRule,
+  MalwareToPersistenceRule,
+  CredentialTheftToLateralRule,
+  RansomwarePreparationRule,
 ];

@@ -1,0 +1,33 @@
+{
+  "name": "r017-startup-persistence",
+  "description": "R017: Run-key registry modification + new service install (7045). Expects R017 WARNING.",
+  "base_time": "2026-11-12T13:25:00Z",
+  "requires_rules": [
+    "R017"
+  ],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "WIN-WS-04",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4657</EventID></System><EventData><Data Name=\"TargetObjectName\">\\REGISTRY\\MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\WindowsUpdate</Data><Data Name=\"NewValue\">C:\\Temp\\upd.exe</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 30,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Service Control Manager\"/><EventID>7045</EventID></System><EventData><Data Name=\"ServiceName\">WinUpdateSvc</Data><Data Name=\"ImagePath\">C:\\Temp\\upd.exe -s</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R017",
+        "min_severity": "WARNING",
+        "min_count": 1
+      }
+    ]
+  }
+}
