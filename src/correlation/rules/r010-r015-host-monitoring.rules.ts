@@ -33,7 +33,14 @@ async function fetchEvents(
         filter: [
           { terms: { source_type: sourceTypes } },
           { terms: { action: actions } },
-          { range: { normalized_at: { gte: since.toISOString(), lte: now.toISOString() } } },
+          {
+            range: {
+              normalized_at: {
+                gte: since.toISOString(),
+                lte: now.toISOString(),
+              },
+            },
+          },
         ],
       },
     },
@@ -56,9 +63,15 @@ function toPayload(e: Hit): IncidentEventPayload {
 
 function entities(events: Hit[]) {
   return {
-    ips: [...new Set(events.map((e) => e.source_ip).filter(Boolean))] as string[],
-    users: [...new Set(events.map((e) => e.user_principal).filter(Boolean))] as string[],
-    hosts: [...new Set(events.map((e) => e.hostname).filter(Boolean))] as string[],
+    ips: [
+      ...new Set(events.map((e) => e.source_ip).filter(Boolean)),
+    ] as string[],
+    users: [
+      ...new Set(events.map((e) => e.user_principal).filter(Boolean)),
+    ] as string[],
+    hosts: [
+      ...new Set(events.map((e) => e.hostname).filter(Boolean)),
+    ] as string[],
   };
 }
 
@@ -76,11 +89,20 @@ export class SuspiciousAdminAccountRule implements DetectionRule {
     time_window_seconds: 3600,
     interval_seconds: 300,
     threshold: 1,
-    source_types: ['linux_auth', 'linux', 'syslog', 'active_directory', 'windows_security'],
+    source_types: [
+      'linux_auth',
+      'linux',
+      'syslog',
+      'active_directory',
+      'windows_security',
+    ],
     actions: ['user_management', 'account_created', 'account_modified'],
   };
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchEvents(
       es,
       since,
@@ -89,9 +111,11 @@ export class SuspiciousAdminAccountRule implements DetectionRule {
     );
 
     const suspicious = events.filter((e) =>
-      /\b(sudo|wheel|admin|root|domain admins|administrators)\b/i.test(e.raw_message ?? ''),
+      /\b(sudo|wheel|admin|root|domain admins|administrators)\b/i.test(
+        e.raw_message ?? '',
+      ),
     );
-    if (suspicious.length < this.definition.threshold!) return [];
+    if (suspicious.length < this.definition.threshold) return [];
 
     return [
       {
@@ -131,7 +155,10 @@ export class SuspiciousPowerShellRule implements DetectionRule {
   private readonly suspiciousRe =
     /(-enc\b|encodedcommand|downloadstring|invoke-expression|\biex\b|frombase64string|bitsex|net\.webclient|invoke-download)/i;
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchEvents(
       es,
       since,
@@ -144,7 +171,7 @@ export class SuspiciousPowerShellRule implements DetectionRule {
       const raw = e.raw_message ?? '';
       return this.powershellRe.test(raw) && this.suspiciousRe.test(raw);
     });
-    if (suspicious.length < this.definition.threshold!) return [];
+    if (suspicious.length < this.definition.threshold) return [];
 
     return [
       {
@@ -183,7 +210,10 @@ export class PrivilegeEscalationRule implements DetectionRule {
   private readonly rootShellRe =
     /(sudo\s+(-i|-s|su)\b|su\s+-?\s*root|sudo\s+su\b|sudoedit|doas\s+-u\s+root)/i;
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchEvents(
       es,
       since,
@@ -191,8 +221,10 @@ export class PrivilegeEscalationRule implements DetectionRule {
       this.definition.actions!,
     );
 
-    const suspicious = events.filter((e) => this.rootShellRe.test(e.raw_message ?? ''));
-    if (suspicious.length < this.definition.threshold!) return [];
+    const suspicious = events.filter((e) =>
+      this.rootShellRe.test(e.raw_message ?? ''),
+    );
+    if (suspicious.length < this.definition.threshold) return [];
 
     return [
       {
@@ -228,7 +260,10 @@ export class SudoAbuseRule implements DetectionRule {
   private readonly dangerousRe =
     /(rm\s+-rf\s+\/|chmod\s+(-R\s+)?777|dd\s+if=|mkfs|shutdown|reboot|\/etc\/passwd|\/etc\/shadow)/i;
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchEvents(
       es,
       since,
@@ -236,8 +271,10 @@ export class SudoAbuseRule implements DetectionRule {
       this.definition.actions!,
     );
 
-    const suspicious = events.filter((e) => this.dangerousRe.test(e.raw_message ?? ''));
-    if (suspicious.length < this.definition.threshold!) return [];
+    const suspicious = events.filter((e) =>
+      this.dangerousRe.test(e.raw_message ?? ''),
+    );
+    if (suspicious.length < this.definition.threshold) return [];
 
     return [
       {
@@ -267,17 +304,24 @@ export class ScheduledTaskRule implements DetectionRule {
     interval_seconds: 300,
     threshold: 1,
     source_types: ['windows_security', 'windows_tasks', 'windows'],
-    actions: ['scheduled_task', 'scheduled_task_created', 'scheduled_task_changed'],
+    actions: [
+      'scheduled_task',
+      'scheduled_task_created',
+      'scheduled_task_changed',
+    ],
   };
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchEvents(
       es,
       since,
       this.definition.source_types!,
       this.definition.actions!,
     );
-    if (events.length < this.definition.threshold!) return [];
+    if (events.length < this.definition.threshold) return [];
 
     return [
       {

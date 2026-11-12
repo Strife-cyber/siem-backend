@@ -37,14 +37,19 @@ async function fetchAuthEvents(
           { terms: { action: actions } },
           {
             range: {
-              normalized_at: { gte: since.toISOString(), lte: now.toISOString() },
+              normalized_at: {
+                gte: since.toISOString(),
+                lte: now.toISOString(),
+              },
             },
           },
         ],
       },
     },
   });
-  return (result.hits.hits as Array<{ _source: AuthHit }>).map((h) => h._source);
+  return (result.hits.hits as Array<{ _source: AuthHit }>).map(
+    (h) => h._source,
+  );
 }
 
 function toPayload(e: AuthHit): IncidentEventPayload {
@@ -81,7 +86,10 @@ export class SshPasswordGuessingRule implements DetectionRule {
     playbook_mode: 'AUTO',
   };
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchAuthEvents(
       es,
       since,
@@ -90,7 +98,9 @@ export class SshPasswordGuessingRule implements DetectionRule {
     );
 
     // Only SSH-ish failures
-    const ssh = events.filter((e) => /sshd|ssh2|port \d+ ssh/i.test(e.raw_message ?? ''));
+    const ssh = events.filter((e) =>
+      /sshd|ssh2|port \d+ ssh/i.test(e.raw_message ?? ''),
+    );
 
     const groups = new Map<string, AuthHit[]>();
     for (const e of ssh) {
@@ -103,13 +113,21 @@ export class SshPasswordGuessingRule implements DetectionRule {
 
     const detections: DetectionResult[] = [];
     for (const [key, list] of groups) {
-      if (list.length < this.definition.threshold!) continue;
-      const times = list.map((e) => new Date(e.collected_at ?? 0).getTime()).sort((a, b) => a - b);
+      if (list.length < this.definition.threshold) continue;
+      const times = list
+        .map((e) => new Date(e.collected_at ?? 0).getTime())
+        .sort((a, b) => a - b);
       const span = (times[times.length - 1] - times[0]) / 1000;
-      if (this.definition.max_time_span_seconds && span > this.definition.max_time_span_seconds) continue;
+      if (
+        this.definition.max_time_span_seconds &&
+        span > this.definition.max_time_span_seconds
+      )
+        continue;
 
       const [ip, user] = key.split('|');
-      const hosts = [...new Set(list.map((e) => e.hostname).filter(Boolean))] as string[];
+      const hosts = [
+        ...new Set(list.map((e) => e.hostname).filter(Boolean)),
+      ] as string[];
       detections.push({
         rule_id: this.id,
         rule_name: this.name,
@@ -145,7 +163,10 @@ export class PasswordSprayingRule implements DetectionRule {
     playbook_mode: 'AUTO',
   };
 
-  async detect(es: ElasticsearchService, since: Date): Promise<DetectionResult[]> {
+  async detect(
+    es: ElasticsearchService,
+    since: Date,
+  ): Promise<DetectionResult[]> {
     const events = await fetchAuthEvents(
       es,
       since,
@@ -161,14 +182,19 @@ export class PasswordSprayingRule implements DetectionRule {
       byIp.set(e.source_ip, list);
     }
 
-    const minUsers = (this.definition.params?.min_distinct_users as number) ?? 3;
+    const minUsers =
+      (this.definition.params?.min_distinct_users as number) ?? 3;
     const detections: DetectionResult[] = [];
     for (const [ip, list] of byIp) {
-      if (list.length < this.definition.threshold!) continue;
-      const users = [...new Set(list.map((e) => e.user_principal).filter(Boolean))] as string[];
+      if (list.length < this.definition.threshold) continue;
+      const users = [
+        ...new Set(list.map((e) => e.user_principal).filter(Boolean)),
+      ] as string[];
       if (users.length < minUsers) continue; // guessing, not spraying
 
-      const hosts = [...new Set(list.map((e) => e.hostname).filter(Boolean))] as string[];
+      const hosts = [
+        ...new Set(list.map((e) => e.hostname).filter(Boolean)),
+      ] as string[];
       detections.push({
         rule_id: this.id,
         rule_name: this.name,
