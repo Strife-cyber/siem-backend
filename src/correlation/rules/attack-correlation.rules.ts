@@ -309,8 +309,9 @@ function sequenceCorrelation(cfg: SequenceStageConfig): AttackCorrelationRule {
           const next = sorted.find(
             (i) =>
               cfg.stages[s].includes(i.rule_id ?? '') &&
-              Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) <=
-                WINDOW_MS &&
+              Math.abs(
+                i.triggered_at.getTime() - cursor.triggered_at.getTime(),
+              ) <= WINDOW_MS &&
               chain.every((c) => shareEntity(c, i)),
           );
           if (!next) {
