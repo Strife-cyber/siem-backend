@@ -155,6 +155,65 @@ export class IncidentsService {
     };
   }
 
+  /**
+   * Cross-incident attack timeline (FR-05.3): incidents in a window plus all
+   * their correlated log events, merged chronologically. Optional entity
+   * filter pivots on IP / user / hostname.
+   */
+  async getAttackTimeline(filters: {
+    from?: string;
+    to?: string;
+    entity?: string;
+  }) {
+    const incidentWhere: Record<string, unknown> = {};
+    if (filters.from || filters.to) {
+      incidentWhere.triggered_at = {};
+      if (filters.from)
+        (incidentWhere.triggered_at as Record<string, string>).gte =
+          filters.from;
+      if (filters.to)
+        (incidentWhere.triggered_at as Record<string, string>).lte = filters.to;
+    }
+
+    const incidents = await this.prisma.incident.findMany({
+      where: incidentWhere,
+      orderBy: { triggered_at: 'asc' },
+      take: 200,
+      include: { rule: { select: { id: true, name: true } } },
+    });
+    const ids = incidents.map((i) => i.id);
+
+    const eventWhere: Record<string, unknown> = { incident_id: { in: ids } };
+    if (filters.entity) {
+      eventWhere.OR = [
+        { source_ip: filters.entity },
+        { destination_ip: filters.entity },
+        { user_principal: filters.entity },
+        { hostname: filters.entity },
+      ];
+    }
+
+    const events = await this.prisma.incidentEvent.findMany({
+      where: eventWhere,
+      orderBy: { collected_at: 'asc' },
+      take: 1000,
+      select: {
+        id: true,
+        incident_id: true,
+        collected_at: true,
+        source_ip: true,
+        destination_ip: true,
+        hostname: true,
+        user_principal: true,
+        action: true,
+        outcome: true,
+        source_type: true,
+      },
+    });
+
+    return { incidents, events };
+  }
+
   async update(
     id: string,
     data: { status?: string; summary?: string; assigned_to?: string },

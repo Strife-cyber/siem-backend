@@ -40,6 +40,22 @@ export class IncidentsController {
     return this.incidentsService.findAll({ status, severity, from, to });
   }
 
+  @Get('attack-timeline')
+  @ApiOperation({
+    summary: 'Cross-incident attack timeline with optional entity pivot',
+  })
+  @ApiQuery({ name: 'from', required: false })
+  @ApiQuery({ name: 'to', required: false })
+  @ApiQuery({ name: 'entity', required: false })
+  @ApiOkResponse({ description: 'Incidents and merged log events' })
+  async getAttackTimeline(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('entity') entity?: string,
+  ) {
+    return this.incidentsService.getAttackTimeline({ from, to, entity });
+  }
+
   @Get(':incidentId')
   @ApiOperation({ summary: 'Get full incident details' })
   @ApiOkResponse({ description: 'Incident details' })
