@@ -1,0 +1,21 @@
+{
+  "name": "r014-sudo-abuse",
+  "description": "R014: sudo used to recursively delete the filesystem root. Expects R014 WARNING incident (alert-only) and NO R013 (not a root-shell transition).",
+  "base_time": "2026-11-12T13:00:00Z",
+  "requires_rules": ["R013", "R014"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "SRV-DB-02",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 13:00:00 srv-db-02 sudo: appuser : TTY=pts/2 ; PWD=/var/lib/app ; USER=root ; COMMAND=/bin/rm -rf /" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R014", "min_severity": "WARNING", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": ["R013"]
+  }
+}

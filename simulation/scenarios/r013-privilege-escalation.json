@@ -1,0 +1,24 @@
+{
+  "name": "r013-privilege-escalation",
+  "description": "R013: interactive root transition via 'sudo su -' recorded by the sudo logger. Expects R013 HIGH incident and isolate_endpoint CONFIRM queued.",
+  "base_time": "2026-11-12T12:55:00Z",
+  "requires_rules": ["R013", "R014"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "SRV-WEB-03",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 12:55:00 srv-web-03 sudo: intern : TTY=pts/1 ; PWD=/home/intern ; USER=root ; COMMAND=/usr/bin/sudo su -" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R013", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": ["R014"],
+    "expect_playbook_executions": [
+      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 }
+    ]
+  }
+}

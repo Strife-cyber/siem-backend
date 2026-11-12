@@ -20,6 +20,8 @@ export const DEFAULT_RISK_WEIGHTS: Record<string, number> = {
   R006: 20, // ssh brute force
   R007: 15, // password spraying
   R008: 30, // successful login after failures
+  R010: 25, // suspicious admin account
+  R011: 30, // suspicious PowerShell
   R013: 30, // privilege escalation
   R014: 20, // sudo abuse
   R015: 10, // scheduled task persistence

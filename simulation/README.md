@@ -122,3 +122,8 @@ them with real lab captures:
 
 This keeps the proof chain honest: real collector format in, real backend
 pipeline out.
+
+## Phase 2 deferred rules (telemetry gaps)
+
+- **R009 Impossible Travel** — needs a GeoIP database; the collector emits no geo fields and no GeoIP service is configured. Deferred until geo enrichment exists.
+- **R012 Linux Shell Abuse** — `LinuxProcess` events fall through to `default_normalized` with action `UNKNOWN` (no command-line telemetry), so command-line abuse patterns cannot be detected. Needs collector process-command telemetry first.
