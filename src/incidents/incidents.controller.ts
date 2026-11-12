@@ -50,6 +50,15 @@ export class IncidentsController {
     return this.incidentsService.findOne(incidentId, userId);
   }
 
+  @Get(':incidentId/timeline')
+  @ApiOperation({
+    summary: 'Forensic timeline: logs, SOAR actions and entity activity',
+  })
+  @ApiOkResponse({ description: 'Merged chronological timeline' })
+  async getTimeline(@Param('incidentId') incidentId: string) {
+    return this.incidentsService.getTimeline(incidentId);
+  }
+
   @Patch(':incidentId')
   @ApiOperation({ summary: 'Update incident status (ANALYST or ADMIN only)' })
   @ApiOkResponse({ description: 'Updated incident' })

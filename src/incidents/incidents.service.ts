@@ -76,6 +76,85 @@ export class IncidentsService {
     return { ...incident, incident_events: events };
   }
 
+  /**
+   * Forensic timeline: correlated log events, SOAR actions and entity
+   * observations for one incident, merged and sorted chronologically.
+   */
+  async getTimeline(id: string) {
+    const incident = await this.prisma.incident.findUnique({ where: { id } });
+    if (!incident) throw new NotFoundException('Incident not found');
+
+    const [logEvents, soarActions, observations, riskEvents] =
+      await Promise.all([
+        this.prisma.incidentEvent.findMany({
+          where: { incident_id: id },
+          orderBy: { collected_at: 'asc' },
+          take: 500,
+          select: {
+            id: true,
+            collected_at: true,
+            source_ip: true,
+            destination_ip: true,
+            hostname: true,
+            user_principal: true,
+            action: true,
+            outcome: true,
+            source_type: true,
+          },
+        }),
+        this.prisma.soarAction.findMany({
+          where: { incident_id: id },
+          orderBy: { created_at: 'asc' },
+        }),
+        this.prisma.entityObservation.findMany({
+          where: { incident_id: id },
+          orderBy: { observed_at: 'asc' },
+          take: 200,
+          include: { entity: { select: { entity_type: true, value: true } } },
+        }),
+        this.prisma.entityRiskEvent.findMany({
+          where: { incident_id: id },
+          orderBy: { observed_at: 'asc' },
+          include: { entity: { select: { entity_type: true, value: true } } },
+        }),
+      ]);
+
+    const events = [
+      ...logEvents.map((e) => ({
+        type: 'log',
+        at: e.collected_at,
+        data: e,
+      })),
+      ...soarActions.map((a) => ({
+        type: 'soar',
+        at: a.created_at,
+        data: a,
+      })),
+      ...observations.map((o) => ({
+        type: 'entity_observation',
+        at: o.observed_at,
+        data: o,
+      })),
+      ...riskEvents.map((r) => ({
+        type: 'risk',
+        at: r.observed_at,
+        data: r,
+      })),
+    ].sort((a, b) => a.at.getTime() - b.at.getTime());
+
+    return {
+      incident: {
+        id: incident.id,
+        rule_id: incident.rule_id,
+        severity: incident.severity,
+        status: incident.status,
+        triggered_at: incident.triggered_at,
+        summary: incident.summary,
+      },
+      events,
+    };
+  }
+
   async update(
     id: string,
     data: { status?: string; summary?: string; assigned_to?: string },
