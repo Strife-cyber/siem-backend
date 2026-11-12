@@ -34,6 +34,9 @@ describe('SoarService', () => {
     listRules: jest.fn(),
     deleteRule: jest.fn(),
     healthCheck: jest.fn(),
+    createAlias: jest.fn(),
+    deleteAlias: jest.fn(),
+    listAliases: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -45,6 +48,9 @@ describe('SoarService', () => {
     agentFns.unIsolateHost.mockResolvedValue({ success: true });
     agentFns.checkIp.mockResolvedValue({ blocked: false, rules: [] });
     agentFns.unblockIp.mockResolvedValue({ success: true });
+    agentFns.createAlias.mockResolvedValue({ status: 'ok' });
+    agentFns.deleteAlias.mockResolvedValue({ status: 'ok' });
+    agentFns.listAliases.mockResolvedValue({ data: [] });
 
     const agent = {
       provider: 'pfsense',
@@ -145,6 +151,77 @@ describe('SoarService', () => {
             status: 'FAILED',
             result_payload: { error: 'db down' },
           }),
+        }),
+      );
+    });
+
+    it('returns FAILED when every target fails (structured failure)', async () => {
+      agentFns.blockIp.mockResolvedValue({ success: false });
+
+      const result = await service.executePlaybook({
+        incident_id: 'inc-1',
+        playbook_name: 'block_ip',
+        mode: 'AUTO',
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(prisma.playbookExecution.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'FAILED' }),
+        }),
+      );
+    });
+
+    it('returns EXECUTED on partial failure (some targets blocked)', async () => {
+      prisma.incident.findUnique.mockResolvedValue({
+        id: 'inc-1',
+        related_entities: {
+          ips: ['10.0.0.1', '10.0.0.2'],
+          hosts: [],
+          users: [],
+        },
+      });
+      agentFns.blockIp
+        .mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ success: false });
+
+      const result = await service.executePlaybook({
+        incident_id: 'inc-1',
+        playbook_name: 'block_ip',
+        mode: 'AUTO',
+      });
+
+      expect(result.status).toBe('EXECUTED');
+      expect(prisma.playbookExecution.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'EXECUTED',
+            result_payload: expect.objectContaining({
+              blocked: ['10.0.0.1'],
+              failed: ['10.0.0.2'],
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('returns FAILED when an alias playbook reports success: false', async () => {
+      agentFns.createAlias.mockResolvedValue({
+        status: 'error',
+        message: 'API unreachable',
+      });
+
+      const result = await service.executePlaybook({
+        incident_id: 'inc-1',
+        playbook_name: 'create_alias',
+        mode: 'AUTO',
+        params: { name: 'siem-blocked-test' },
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(prisma.playbookExecution.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'FAILED' }),
         }),
       );
     });

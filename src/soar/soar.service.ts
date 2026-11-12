@@ -97,7 +97,7 @@ export class SoarService {
         executionId,
       );
 
-      const failed = typeof resultPayload.error === 'string';
+      const failed = this.playbookFailed(resultPayload);
       const status = failed ? ExecutionStatus.FAILED : ExecutionStatus.EXECUTED;
 
       await this.prisma.playbookExecution.update({
@@ -111,7 +111,7 @@ export class SoarService {
 
       if (failed) {
         this.logger.error(
-          `[SOAR] ${playbookName} FAILED: ${errorMessage(resultPayload.error)}`,
+          `[SOAR] ${playbookName} FAILED: ${JSON.stringify(resultPayload)}`,
         );
       } else {
         this.logger.log(
@@ -139,6 +139,27 @@ export class SoarService {
       this.logger.error(`[SOAR] ${playbookName} FAILED: ${message}`);
       return { execution_id: executionId, status: ExecutionStatus.FAILED };
     }
+  }
+
+  /**
+   * Playbooks report failures in several shapes: `{ error }` for unknown
+   * playbooks, `{ success: false }` from alias playbooks, and
+   * `{ blocked|isolated: [], failed: [...] }` when every target failed.
+   * Partial failures (some targets succeeded) still count as executed —
+   * the payload records which targets failed.
+   */
+  private playbookFailed(payload: Record<string, unknown>): boolean {
+    if (typeof payload.error === 'string') return true;
+    if (payload.success === false) return true;
+
+    const failed = Array.isArray(payload.failed) ? payload.failed.length : 0;
+    if (failed === 0) return false;
+
+    const anySucceeded = ['blocked', 'isolated'].some((key) => {
+      const value = payload[key];
+      return Array.isArray(value) && value.length > 0;
+    });
+    return !anySucceeded;
   }
 
   private async runPlaybook(
