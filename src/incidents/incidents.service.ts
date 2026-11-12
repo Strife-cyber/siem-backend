@@ -175,6 +175,27 @@ export class IncidentsService {
         (incidentWhere.triggered_at as Record<string, string>).lte = filters.to;
     }
 
+    // Entity pivot: resolve matching incident ids FIRST so the incident
+    // limit cannot crowd out matches, then scope both queries to them.
+    let pivotIds: string[] | undefined;
+    if (filters.entity) {
+      const matches = await this.prisma.incidentEvent.findMany({
+        where: {
+          OR: [
+            { source_ip: filters.entity },
+            { destination_ip: filters.entity },
+            { user_principal: filters.entity },
+            { hostname: filters.entity },
+          ],
+        },
+        select: { incident_id: true },
+        distinct: ['incident_id'],
+        take: 500,
+      });
+      pivotIds = matches.map((m) => m.incident_id);
+      incidentWhere.id = { in: pivotIds };
+    }
+
     const incidents = await this.prisma.incident.findMany({
       where: incidentWhere,
       orderBy: { triggered_at: 'asc' },
