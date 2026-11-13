@@ -119,6 +119,10 @@ export class ElasticsearchService implements OnModuleInit {
                 normalizer: 'case_insensitive',
               },
               command_line: { type: 'text' },
+              domain: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
               file_path: {
                 type: 'keyword',
                 normalizer: 'case_insensitive',
@@ -181,6 +185,10 @@ export class ElasticsearchService implements OnModuleInit {
             normalizer: 'case_insensitive',
           },
           command_line: { type: 'text' },
+          domain: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
           file_path: {
             type: 'keyword',
             normalizer: 'case_insensitive',

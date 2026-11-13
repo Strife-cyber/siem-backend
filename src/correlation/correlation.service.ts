@@ -31,6 +31,7 @@ import {
 } from './rules/r010-r015-host-monitoring.rules';
 import { LinuxShellAbuseRule } from './rules/r012-linux-shell-abuse.rule';
 import { SshPersistenceRule } from './rules/r016-ssh-persistence.rule';
+import { DnsTunnelingRule } from './rules/r024-dns-tunneling.rule';
 import { ATTACK_CORRELATION_RULES } from './rules/attack-correlation.rules';
 import type {
   DetectionRule,
@@ -86,6 +87,7 @@ export class CorrelationService {
     new RdpLateralMovementRule(),
     new LinuxShellAbuseRule(),
     new SshPersistenceRule(),
+    new DnsTunnelingRule(),
   ];
 
   /** Layer-2 attack correlation rules (C001–C003) — run after event rules */
