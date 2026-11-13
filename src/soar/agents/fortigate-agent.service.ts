@@ -87,8 +87,13 @@ export class FortiGateAgentService implements IFirewallAgent {
 
   async unblockIp(ip: string): Promise<FirewallActionResponse> {
     const addrName = `SmartSIEM-Block-${ip}`;
-    await this.deletePolicy(addrName);
-    await this.deleteAddressObject(addrName);
+    const policyOk = await this.deletePolicy(addrName);
+    const addrOk = await this.deleteAddressObject(addrName);
+    if (!policyOk || !addrOk) {
+      throw new Error(
+        `FortiGate unblock failed for ${ip}: policy=${policyOk} address=${addrOk}`,
+      );
+    }
     return this.buildResponse(true, {
       action_requested: 'unblock_ip',
       action_applied: 'unblock_ip',
@@ -136,9 +141,14 @@ export class FortiGateAgentService implements IFirewallAgent {
 
   async unIsolateHost(ip: string): Promise<FirewallActionResponse> {
     const addrName = `SmartSIEM-Isolate-${ip}`;
-    await this.deletePolicy(`${addrName}-out`);
-    await this.deletePolicy(`${addrName}-in`);
-    await this.deleteAddressObject(addrName);
+    const outOk = await this.deletePolicy(`${addrName}-out`);
+    const inOk = await this.deletePolicy(`${addrName}-in`);
+    const addrOk = await this.deleteAddressObject(addrName);
+    if (!outOk || !inOk || !addrOk) {
+      throw new Error(
+        `FortiGate un-isolate failed for ${ip}: out=${outOk} in=${inOk} address=${addrOk}`,
+      );
+    }
     return this.buildResponse(true, {
       action_requested: 'unisolate_host',
       action_applied: 'unisolate_host',
@@ -222,10 +232,12 @@ export class FortiGateAgentService implements IFirewallAgent {
   }
 
   async deleteRule(name: string): Promise<FirewallActionResponse> {
+    const prefix = FortiGateAgentService.PREFIX;
     const policies = await this.getAllPolicies();
-    const matching = policies.filter((p: any) =>
-      String(p.name ?? '').startsWith(name),
-    );
+    const matching = policies.filter((p: any) => {
+      const n = String(p.name ?? '');
+      return n.startsWith(prefix) && n.startsWith(name);
+    });
     let deleted = 0;
     for (const p of matching) {
       if (await this.deletePolicy(String(p.name))) deleted++;
@@ -234,8 +246,9 @@ export class FortiGateAgentService implements IFirewallAgent {
     const addresses = await this.getAllAddressObjects();
     let addrsDeleted = 0;
     for (const a of addresses) {
-      if (String(a.name ?? '').startsWith(name)) {
-        if (await this.deleteAddressObject(String(a.name))) addrsDeleted++;
+      const n = String(a.name ?? '');
+      if (n.startsWith(prefix) && n.startsWith(name)) {
+        if (await this.deleteAddressObject(n)) addrsDeleted++;
       }
     }
     return this.buildResponse(true, {
@@ -294,7 +307,16 @@ export class FortiGateAgentService implements IFirewallAgent {
       comment: `Smart SIEM - ${comment}`,
     };
     if (existing) {
-      await this.request('PUT', `/api/v2/cmdb/firewall/address/${name}`, body);
+      const res = await this.request(
+        'PUT',
+        `/api/v2/cmdb/firewall/address/${name}`,
+        body,
+      );
+      if (res.status !== 'success') {
+        throw new Error(
+          `FortiGate address object update failed: ${JSON.stringify(res.error ?? res)}`,
+        );
+      }
       return;
     }
     const res = await this.request(
@@ -317,8 +339,12 @@ export class FortiGateAgentService implements IFirewallAgent {
       `/api/v2/cmdb/firewall/address?name=${encodeURIComponent(name)}`,
     );
     const results = res.results;
-    if (Array.isArray(results)) return results[0] ?? null;
-    return null;
+    if (!Array.isArray(results)) return null;
+    return (
+      (results.find((r: any) => r?.name === name) as
+        | Record<string, unknown>
+        | undefined) ?? null
+    );
   }
 
   private async deleteAddressObject(name: string): Promise<boolean> {
@@ -346,16 +372,23 @@ export class FortiGateAgentService implements IFirewallAgent {
     const existing = await this.getServiceObject(name);
     const body = {
       name,
-      protocol: protocol.toUpperCase(),
+      // FortiOS only offers the combined transport enum; the portrange
+      // field selects the actual protocol (tcp-portrange / udp-portrange).
+      protocol: 'TCP/UDP/UDP-Lite/SCTP',
       [`${protocol}-portrange`]: `${port}`,
       comment: `Smart SIEM - ${comment}`,
     };
     if (existing) {
-      await this.request(
+      const res = await this.request(
         'PUT',
         `/api/v2/cmdb/firewall.service/custom/${name}`,
         body,
       );
+      if (res.status !== 'success') {
+        throw new Error(
+          `FortiGate service object update failed: ${JSON.stringify(res.error ?? res)}`,
+        );
+      }
       return;
     }
     const res = await this.request(
@@ -378,8 +411,12 @@ export class FortiGateAgentService implements IFirewallAgent {
       `/api/v2/cmdb/firewall.service/custom?name=${encodeURIComponent(name)}`,
     );
     const results = res.results;
-    if (Array.isArray(results)) return results[0] ?? null;
-    return null;
+    if (!Array.isArray(results)) return null;
+    return (
+      (results.find((r: any) => r?.name === name) as
+        | Record<string, unknown>
+        | undefined) ?? null
+    );
   }
 
   /**
@@ -406,11 +443,18 @@ export class FortiGateAgentService implements IFirewallAgent {
       comments: `Smart SIEM - deny ${srcAddrName} -> ${dstAddrName}`,
     };
     if (existing) {
-      await this.request(
+      // FortiOS addresses firewall/policy objects by numeric policyid
+      const policyKey = String((existing as any).policyid ?? policyName);
+      const res = await this.request(
         'PUT',
-        `/api/v2/cmdb/firewall/policy/${encodeURIComponent(policyName)}`,
+        `/api/v2/cmdb/firewall/policy/${encodeURIComponent(policyKey)}`,
         body,
       );
+      if (res.status !== 'success') {
+        throw new Error(
+          `FortiGate policy update failed: ${JSON.stringify(res.error ?? res)}`,
+        );
+      }
       return;
     }
     const res = await this.request(
@@ -433,8 +477,12 @@ export class FortiGateAgentService implements IFirewallAgent {
       `/api/v2/cmdb/firewall/policy?name=${encodeURIComponent(name)}`,
     );
     const results = res.results;
-    if (Array.isArray(results)) return results[0] ?? null;
-    return null;
+    if (!Array.isArray(results)) return null;
+    return (
+      (results.find((r: any) => r?.name === name) as
+        | Record<string, unknown>
+        | undefined) ?? null
+    );
   }
 
   private async getAllPolicies(): Promise<any[]> {
@@ -446,9 +494,13 @@ export class FortiGateAgentService implements IFirewallAgent {
   }
 
   private async deletePolicy(name: string): Promise<boolean> {
+    // FortiOS requires the numeric policyid in the URL, not the name.
+    const existing = await this.getPolicy(name);
+    if (!existing) return true; // nothing to delete (idempotent)
+    const policyKey = String((existing as any).policyid ?? name);
     const res = await this.request(
       'DELETE',
-      `/api/v2/cmdb/firewall/policy/${encodeURIComponent(name)}`,
+      `/api/v2/cmdb/firewall/policy/${encodeURIComponent(policyKey)}`,
     );
     return res.status === 'success' || res.http_status === 404;
   }
