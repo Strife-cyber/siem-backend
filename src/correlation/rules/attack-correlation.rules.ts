@@ -421,6 +421,63 @@ const RansomwarePreparationRule = sequenceCorrelation({
   response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
 });
 
+/**
+ * C004 — Data staging followed by exfiltration (spec §4, MITRE T1074+T1041)
+ * R008 (successful access) → R025 (unusual staging) → R003 (outbound flow
+ * volume) sharing entities within 30 minutes → isolate with confirmation.
+ * The spec's directory-enumeration step has no dedicated rule yet; access +
+ * staging + transfer is the provable chain.
+ */
+const StagingToExfiltrationRule = sequenceCorrelation({
+  id: 'C004',
+  name: 'Data Staging and Exfiltration Chain',
+  stages: [['R008'], ['R025'], ['R003']],
+  severity: 'HIGH',
+  confidence: 85,
+  summary: (chain) =>
+    `Exfiltration sequence: access (${chain[0].rule_id}) → staging ` +
+    `(${chain[1].rule_id}) → outbound transfer (${chain[2].rule_id}) ` +
+    `within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
+/**
+ * C005 — Defense evasion followed by exfiltration (spec §4, MITRE T1562+T1070+T1041)
+ * R018 (security tools disabled) → R019 (firewall modified) or R004 (logs
+ * cleared) → R003 (outbound flow volume) → CRITICAL, isolate CONFIRM.
+ */
+const DefenseEvasionToExfilRule = sequenceCorrelation({
+  id: 'C005',
+  name: 'Defense Evasion to Exfiltration Chain',
+  stages: [['R018'], ['R019', 'R004'], ['R003']],
+  severity: 'CRITICAL',
+  confidence: 88,
+  summary: (chain) =>
+    `Exfiltration after defense evasion: ${chain[0].rule_id} → ` +
+    `${chain[1].rule_id} → outbound transfer (${chain[2].rule_id}) ` +
+    `within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
+/**
+ * C009 — Internal recon followed by abnormal transfer (spec §4, MITRE T1018+T1046+T1041)
+ * R021 (internal discovery) → R005 (reconnaissance/scan) → R003 (outbound
+ * flow volume). Database-connection and query-anomaly steps have no
+ * telemetry yet; this correlates the provable recon → transfer chain.
+ */
+const ReconToDataTransferRule = sequenceCorrelation({
+  id: 'C009',
+  name: 'Internal Recon to Data Transfer Chain',
+  stages: [['R021'], ['R005'], ['R003']],
+  severity: 'HIGH',
+  confidence: 80,
+  summary: (chain) =>
+    `Recon-to-exfil sequence: internal discovery (${chain[0].rule_id}) → ` +
+    `scan (${chain[1].rule_id}) → abnormal outbound transfer ` +
+    `(${chain[2].rule_id}) within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
 export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   new ReconToAccessRule(),
   new BruteForceToCompromiseRule(),
@@ -429,4 +486,7 @@ export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   MalwareToPersistenceRule,
   CredentialTheftToLateralRule,
   RansomwarePreparationRule,
+  StagingToExfiltrationRule,
+  DefenseEvasionToExfilRule,
+  ReconToDataTransferRule,
 ];

@@ -49,6 +49,9 @@ export class DataExfilRule implements DetectionRule {
     const byteResults = await this.detectByVolume(es, since, now);
     results.push(...byteResults);
 
+    const flowResults = await this.detectByFlowBytes(es, since, now);
+    results.push(...flowResults);
+
     if (byteResults.length === 0) {
       const countResults = await this.detectByConnectionCount(es, since, now);
       results.push(...countResults);
@@ -181,5 +184,78 @@ export class DataExfilRule implements DetectionRule {
           users: [b.key as string],
         },
       }));
+  }
+
+  /**
+   * Flow-summary path: the collector aggregates pfSense filterlog packets
+   * into per-flow FLOW_BYTES documents carrying bytes_sent/direction.
+   * Groups outbound flow summaries by internal source IP and fires on
+   * volume above min_volume_mb.
+   */
+  private async detectByFlowBytes(
+    es: ElasticsearchService,
+    since: Date,
+    now: Date,
+  ): Promise<DetectionResult[]> {
+    const result = await es
+      .getClient()
+      .search({
+        index: 'ctu-logs',
+        size: 0,
+        query: {
+          bool: {
+            filter: [
+              { terms: { source_type: this.definition.source_types! } },
+              { term: { action: 'flow_bytes' } },
+              { term: { direction: 'outbound' } },
+              { exists: { field: 'bytes_sent' } },
+              {
+                range: {
+                  normalized_at: {
+                    gte: since.toISOString(),
+                    lte: now.toISOString(),
+                  },
+                },
+              },
+            ],
+          },
+        },
+        aggs: {
+          by_source_ip: {
+            terms: { field: 'source_ip', size: 50, min_doc_count: 1 },
+            aggs: {
+              total_bytes: { sum: { field: 'bytes_sent' } },
+              destinations: { terms: { field: 'destination_ip', size: 5 } },
+            },
+          },
+        },
+      })
+      .then((r) => r as any);
+
+    const minVolumeMb = (this.definition.params as any)
+      ?.min_volume_mb as number;
+    const buckets = result?.aggregations?.by_source_ip?.buckets ?? [];
+    return buckets
+      .filter((b: any) => {
+        const totalMb = (b.total_bytes?.value ?? 0) / (1024 * 1024);
+        return totalMb > minVolumeMb;
+      })
+      .map((b: any) => {
+        const totalMb = ((b.total_bytes?.value ?? 0) / (1024 * 1024)).toFixed(
+          1,
+        );
+        const dests: string[] =
+          b.destinations?.buckets?.map((d: any) => d.key) ?? [];
+        return {
+          rule_id: this.id,
+          rule_name: this.name,
+          severity: 'CRITICAL' as const,
+          confidence_score: 75,
+          summary: `High-volume outbound flow from ${b.key}: ${totalMb}MB in 15min to ${dests.join(', ') || 'unknown destinations'}`,
+          related_entities: {
+            ips: [b.key as string, ...dests],
+          },
+        };
+      });
   }
 }
