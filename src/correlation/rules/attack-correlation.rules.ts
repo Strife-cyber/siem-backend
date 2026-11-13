@@ -404,6 +404,44 @@ function bridgedShareEntity(
   return pairs.some(([x, y]) => x.length > 0 && y.length > 0 && overlap(x, y));
 }
 
+/**
+ * Depth-first stage matcher with backtracking. The greedy first-match can
+ * commit to a stage candidate that dead-ends — e.g. the oldest staging
+ * incident shares no entity with the terminal exfil incident while a newer
+ * one does — so every candidate is tried before giving up on the start.
+ */
+function findBridgedChain(
+  start: IncidentRow,
+  cfg: SequenceStageConfig,
+  sorted: IncidentRow[],
+  bridge: Map<string, string[]>,
+): IncidentRow[] | null {
+  const chain: IncidentRow[] = [start];
+  const used = new Set<string>([start.id]);
+  const search = (stage: number): boolean => {
+    if (stage === cfg.stages.length) return true;
+    const cursor = chain[chain.length - 1];
+    for (const i of sorted) {
+      if (used.has(i.id)) continue;
+      if (!cfg.stages[stage].includes(i.rule_id ?? '')) continue;
+      if (
+        Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
+        WINDOW_MS
+      ) {
+        continue;
+      }
+      if (!chain.every((c) => bridgedShareEntity(c, i, bridge))) continue;
+      chain.push(i);
+      used.add(i.id);
+      if (search(stage + 1)) return true;
+      chain.pop();
+      used.delete(i.id);
+    }
+    return false;
+  };
+  return search(1) ? chain : null;
+}
+
 /** sequenceCorrelation variant that bridges IP-only incidents to hosts via the entity graph. */
 function bridgedSequenceCorrelation(
   cfg: SequenceStageConfig,
@@ -423,27 +461,8 @@ function bridgedSequenceCorrelation(
 
       for (const start of sorted) {
         if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
-        const chain: IncidentRow[] = [start];
-        let cursor = start;
-        let matched = true;
-
-        for (let s = 1; s < cfg.stages.length; s++) {
-          const next = sorted.find(
-            (i) =>
-              cfg.stages[s].includes(i.rule_id ?? '') &&
-              Math.abs(
-                i.triggered_at.getTime() - cursor.triggered_at.getTime(),
-              ) <= WINDOW_MS &&
-              chain.every((c) => bridgedShareEntity(c, i, bridge)),
-          );
-          if (!next) {
-            matched = false;
-            break;
-          }
-          chain.push(next);
-          cursor = next;
-        }
-        if (!matched) continue;
+        const chain = findBridgedChain(start, cfg, sorted, bridge);
+        if (!chain) continue;
 
         const key = chain.map((c) => c.id).join('|');
         if (fired.has(key)) continue;
