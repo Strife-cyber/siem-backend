@@ -25,6 +25,7 @@ export class ElasticsearchService implements OnModuleInit {
     await this.ensureIlmPolicy();
     await this.ensureIndexTemplate();
     await this.ensureInitialIndex();
+    await this.ensureTelemetryMappings();
     this.logger.log(
       'Elasticsearch initialized: ILM policy, index template, and initial index ready',
     );
@@ -113,6 +114,19 @@ export class ElasticsearchService implements OnModuleInit {
               },
               action: { type: 'keyword', normalizer: 'case_insensitive' },
               outcome: { type: 'keyword', normalizer: 'case_insensitive' },
+              process_name: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              command_line: { type: 'text' },
+              file_path: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              file_operation: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
               severity: { type: 'byte' },
               raw_message: {
                 type: 'text',
@@ -152,6 +166,33 @@ export class ElasticsearchService implements OnModuleInit {
       this.logger.log(`Index template "${LOGS_INDEX_TEMPLATE}" ensured`);
     } catch (error) {
       this.logger.error('Failed to create index template', error);
+    }
+  }
+
+  // New telemetry fields added after the initial template shipped.
+  // Adding fields to an existing mapping is allowed by Elasticsearch.
+  private async ensureTelemetryMappings() {
+    try {
+      await this.client.indices.putMapping({
+        index: LOGS_ALIAS,
+        properties: {
+          process_name: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
+          command_line: { type: 'text' },
+          file_path: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
+          file_operation: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
+        },
+      });
+    } catch (error) {
+      this.logger.error('Failed to update telemetry field mappings', error);
     }
   }
 
