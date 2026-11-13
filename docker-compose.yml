@@ -71,30 +71,16 @@ services:
     networks:
       - siem-network
 
+  # New CSR SPA (Strife-cyber/siem-frontend), built from the sibling repo.
+  # Served internally on :80; the caddy service reverse-proxies non-API traffic to it.
   frontend:
-    image: cloudx02/siem-frontend:1.1.1
+    build:
+      context: ../siem-frontend
+      dockerfile: Dockerfile
     container_name: siem-frontend
-    environment:
-      VITE_API_URL: http://localhost
-      VITE_WS_URL: http://localhost
-      VITE_USE_DEMO_DATA: "false"
-    ports:
-      - '5173:3001'
     depends_on:
       app:
         condition: service_started
-    networks:
-      - siem-network
-
-  # ── Populates the shared frontend assets volume on startup ──
-  frontend-assets:
-    image: cloudx02/siem-frontend:1.1.1
-    container_name: siem-frontend-assets
-    user: root
-    volumes:
-      - frontend_assets:/output:rw
-      - ./frontend-assets-init.sh:/init.sh:ro
-    command: sh /init.sh
     networks:
       - siem-network
 
@@ -107,10 +93,9 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-      - frontend_assets:/var/www/frontend:ro
     depends_on:
-      frontend-assets:
-        condition: service_completed_successfully
+      frontend:
+        condition: service_started
       app:
         condition: service_started
     networks:
@@ -162,8 +147,6 @@ volumes:
   elasticsearch_data:
     driver: local
   caddy_data:
-    driver: local
-  frontend_assets:
     driver: local
 
 networks:
