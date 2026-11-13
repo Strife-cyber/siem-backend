@@ -219,6 +219,12 @@ const RULES = [
       source_types: ['linux_auditd'], actions: ['process_exec'] },
     confidence_weight: 85, is_active: false,
   },
+  {
+    id: 'R016', name: 'SSH Persistence (authorized_keys)', tactic: 'TA0003', technique: 'T1098.004',
+    definition: { time_window_seconds: 900, interval_seconds: 300, threshold: 1,
+      source_types: ['linux_auditd'], actions: ['file_access'] },
+    confidence_weight: 85, is_active: false,
+  },
   // ── Layer-2 attack correlation rules (C001–C003) ──
   {
     id: 'C001',

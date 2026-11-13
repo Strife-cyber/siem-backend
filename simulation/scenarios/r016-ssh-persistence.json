@@ -1,0 +1,48 @@
+{
+  "name": "r016-ssh-persistence",
+  "description": "R016: auditd PATH records creating/modifying /home/admin/.ssh/authorized_keys (T1098.004). Benign file events on other paths must not match. Expects R016 HIGH incident (alert-only; no analyst-alert playbook exists).",
+  "base_time": "2026-11-13T11:00:00Z",
+  "requires_rules": [
+    "R016"
+  ],
+  "sources": [
+    {
+      "source_type": "LINUX_AUDITD",
+      "hostname": "SRV-DB-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "type=PATH msg=audit(1763036400.100:3001): item=0 name=\"/home/appuser/.bashrc\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 5,
+          "raw": "type=PATH msg=audit(1763036405.100:3002): item=0 name=\"/etc/ssh/sshd_config\" nametype=CREATE mode=0100644 ouid=0 ogid=0 rdev=00:00"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "type=PATH msg=audit(1763036410.100:3003): item=0 name=\"/home/admin/.ssh/authorized_keys\" nametype=CREATE mode=0100600 ouid=1000 ogid=1000 rdev=00:00"
+        },
+        {
+          "offset_seconds": 15,
+          "raw": "type=PATH msg=audit(1763036415.100:3004): item=1 name=\"/home/admin/.ssh/authorized_keys\" nametype=RENAME mode=0100600 ouid=0 ogid=0 rdev=00:00"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R016",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_entity_risk": [
+      {
+        "entity_type": "HOST",
+        "value": "srv-db-01",
+        "min_score": 20
+      }
+    ]
+  }
+}
