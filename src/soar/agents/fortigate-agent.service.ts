@@ -173,7 +173,10 @@ export class FortiGateAgentService implements IFirewallAgent {
     const validation = validateBlockIp(ip);
     if (!validation.valid) throw new Error(validation.error);
     const effectiveReason = reason ?? 'Port blocked by Smart SIEM';
-    const addrName = `SmartSIEM-Port-${ip}-${port}`;
+    // Protocol is part of the object names: blocking TCP and UDP for the
+    // same IP/port must produce two independent policies, otherwise the
+    // second block would overwrite the first policy's service.
+    const addrName = `SmartSIEM-Port-${ip}-${port}-${protocol}`;
     const svcName = `SmartSIEM-Svc-${port}-${protocol}`;
 
     await this.ensureAddressObject(addrName, ip, effectiveReason);
@@ -201,18 +204,20 @@ export class FortiGateAgentService implements IFirewallAgent {
   // ══════════════════════════════════════════════════
 
   async checkIp(ip: string): Promise<CheckIpResponse> {
-    const names = [
-      `SmartSIEM-Block-${ip}`,
-      `SmartSIEM-Isolate-${ip}`,
-      `SmartSIEM-Isolate-${ip}-out`,
-      `SmartSIEM-Isolate-${ip}-in`,
-    ];
-    const found: unknown[] = [];
-    for (const name of names) {
-      const obj = await this.getAddressObject(name);
-      if (obj) found.push(obj);
-    }
-    return { blocked: found.length > 0, rules: found };
+    // Containment is enforced by the deny policies, not the address objects:
+    // an address object alone blocks no traffic, and an orphaned one (policy
+    // creation failed) must not report the IP as blocked.
+    const policies = await this.getAllPolicies();
+    const blocked = policies.filter((p: any) => {
+      const name = String(p?.name ?? '');
+      if (!name.startsWith(FortiGateAgentService.PREFIX)) return false;
+      const isForIp =
+        name === `SmartSIEM-Block-${ip}` ||
+        name.startsWith(`SmartSIEM-Isolate-${ip}-`) ||
+        name.startsWith(`SmartSIEM-Port-${ip}-`);
+      return isForIp && String(p?.action ?? 'deny') === 'deny';
+    });
+    return { blocked: blocked.length > 0, rules: blocked };
   }
 
   async listRules(): Promise<FirewallActionResponse> {
@@ -455,6 +460,7 @@ export class FortiGateAgentService implements IFirewallAgent {
           `FortiGate policy update failed: ${JSON.stringify(res.error ?? res)}`,
         );
       }
+      await this.movePolicyToTop(policyName);
       return;
     }
     const res = await this.request(
@@ -465,6 +471,36 @@ export class FortiGateAgentService implements IFirewallAgent {
     if (res.status !== 'success') {
       throw new Error(
         `FortiGate policy create failed: ${JSON.stringify(res.error ?? res)}`,
+      );
+    }
+    await this.movePolicyToTop(policyName);
+  }
+
+  /**
+   * FortiGate evaluates policies top-down and first match wins, so a deny
+   * policy appended at the bottom is shadowed by any earlier allow policy.
+   * Smart SIEM containment policies are therefore moved to the top of the
+   * list after every create/update (self-healing if reordered manually).
+   */
+  private async movePolicyToTop(policyName: string): Promise<void> {
+    const policies = await this.getAllPolicies();
+    const entries = policies
+      .map((p: any) => ({
+        name: String(p?.name ?? ''),
+        id: Number(p?.policyid),
+      }))
+      .filter((p) => p.name !== '' && Number.isFinite(p.id))
+      .sort((a, b) => a.id - b.id);
+    const ours = entries.find((p) => p.name === policyName);
+    const first = entries.find((p) => p.name !== policyName);
+    if (!ours || !first || ours.id <= first.id) return;
+    const res = await this.request(
+      'PUT',
+      `/api/v2/cmdb/firewall/policy/${encodeURIComponent(String(ours.id))}?action=move&before=${encodeURIComponent(String(first.id))}`,
+    );
+    if (res.status !== 'success') {
+      this.logger.warn(
+        `[fortigate] policy reorder failed for ${policyName}: ${JSON.stringify(res.error ?? res)}`,
       );
     }
   }
