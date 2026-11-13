@@ -1,0 +1,68 @@
+{
+  "name": "r025-unusual-data-staging",
+  "description": "R025 (T1074): an attacker on srv-file-01 aggregates collected data into seven archive files within 15 minutes (auditd PATH CREATE records), plus two benign non-archive file creations that must not count. Expects R025 HIGH incident (alert-only; no analyst-alert playbook exists).",
+  "base_time": "2026-11-13T12:00:00Z",
+  "requires_rules": [
+    "R025"
+  ],
+  "sources": [
+    {
+      "source_type": "LINUX_AUDITD",
+      "hostname": "SRV-FILE-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "type=PATH msg=audit(1763037600.100:4001): item=0 name=\"/tmp/customer-data-1.zip\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "type=PATH msg=audit(1763037610.100:4002): item=0 name=\"/tmp/db-dump-2.7z\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 20,
+          "raw": "type=PATH msg=audit(1763037620.100:4003): item=0 name=\"/home/admin/backups.tar.gz\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 30,
+          "raw": "type=PATH msg=audit(1763037630.100:4004): item=0 name=\"/tmp/exfil-staging.rar\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 40,
+          "raw": "type=PATH msg=audit(1763037640.100:4005): item=0 name=\"/var/tmp/stage-3.zipx\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 50,
+          "raw": "type=PATH msg=audit(1763037650.100:4006): item=0 name=\"/tmp/archive-4.tar\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 60,
+          "raw": "type=PATH msg=audit(1763037660.100:4007): item=0 name=\"/home/admin/documents.tgz\" nametype=CREATE mode=0100644 ouid=1001 ogid=1001 rdev=00:00"
+        },
+        {
+          "offset_seconds": 70,
+          "raw": "type=PATH msg=audit(1763037670.100:4008): item=0 name=\"/var/log/app/app.log\" nametype=CREATE mode=0100644 ouid=0 ogid=0 rdev=00:00"
+        },
+        {
+          "offset_seconds": 80,
+          "raw": "type=PATH msg=audit(1763037680.100:4009): item=0 name=\"/etc/nginx/sites-available/default\" nametype=CREATE mode=0100644 ouid=0 ogid=0 rdev=00:00"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R025",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_entity_risk": [
+      {
+        "entity_type": "HOST",
+        "value": "srv-file-01",
+        "min_score": 20
+      }
+    ]
+  }
+}

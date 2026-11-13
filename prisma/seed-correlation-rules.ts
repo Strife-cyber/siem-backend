@@ -429,6 +429,21 @@ const RULES = [
     confidence_weight: 85,
     is_active: false,
   },
+  {
+    id: 'R025',
+    name: 'Unusual Data Staging',
+    tactic: 'TA0009',
+    technique: 'T1074',
+    definition: {
+      time_window_seconds: 900,
+      interval_seconds: 300,
+      threshold: 5,
+      source_types: ['linux_auditd', 'windows_security', 'windows_fim'],
+      actions: ['file_access'],
+    },
+    confidence_weight: 80,
+    is_active: false,
+  },
   // ── Layer-2 attack correlation rules (C001–C003) ──
   {
     id: 'C001',
