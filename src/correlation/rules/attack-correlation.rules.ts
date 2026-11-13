@@ -351,6 +351,151 @@ function sequenceCorrelation(cfg: SequenceStageConfig): AttackCorrelationRule {
 }
 
 /**
+ * IP→HOST bridge through the entity graph: incidents like R003 (flow
+ * bytes) carry only IPs while staging/persistence incidents carry only
+ * hosts. The entity graph links an IP to the hosts it contacted, so a
+ * terminal exfil incident can be matched back to the compromised host.
+ */
+async function bridgeIpsToHosts(
+  prisma: PrismaService,
+  incidents: IncidentRow[],
+): Promise<Map<string, string[]>> {
+  const ips = [...new Set(incidents.flatMap((i) => ipsOf(i)))];
+  if (ips.length === 0) return new Map();
+  const edges = await prisma.entityEdge.findMany({
+    where: {
+      source: { entity_type: 'IP', value: { in: ips } },
+      target: { entity_type: 'HOST' },
+    },
+    select: {
+      source: { select: { value: true } },
+      target: { select: { value: true } },
+    },
+  });
+  const ipToHosts = new Map<string, Set<string>>();
+  for (const e of edges) {
+    const set = ipToHosts.get(e.source.value) ?? new Set<string>();
+    set.add(e.target.value);
+    ipToHosts.set(e.source.value, set);
+  }
+  const out = new Map<string, string[]>();
+  for (const i of incidents) {
+    const hosts = new Set<string>();
+    for (const ip of ipsOf(i)) {
+      for (const h of ipToHosts.get(ip) ?? []) hosts.add(h);
+    }
+    if (hosts.size > 0) out.set(i.id, [...hosts]);
+  }
+  return out;
+}
+
+function bridgedShareEntity(
+  a: IncidentRow,
+  b: IncidentRow,
+  bridge: Map<string, string[]>,
+): boolean {
+  const effectiveHosts = (i: IncidentRow) =>
+    union(hostsOf(i), bridge.get(i.id) ?? []);
+  const pairs: Array<[string[], string[]]> = [
+    [ipsOf(a), ipsOf(b)],
+    [effectiveHosts(a), effectiveHosts(b)],
+    [usersOf(a), usersOf(b)],
+  ];
+  return pairs.some(([x, y]) => x.length > 0 && y.length > 0 && overlap(x, y));
+}
+
+/**
+ * Depth-first stage matcher with backtracking. The greedy first-match can
+ * commit to a stage candidate that dead-ends — e.g. the oldest staging
+ * incident shares no entity with the terminal exfil incident while a newer
+ * one does — so every candidate is tried before giving up on the start.
+ */
+function findBridgedChain(
+  start: IncidentRow,
+  cfg: SequenceStageConfig,
+  sorted: IncidentRow[],
+  bridge: Map<string, string[]>,
+): IncidentRow[] | null {
+  const chain: IncidentRow[] = [start];
+  const used = new Set<string>([start.id]);
+  const search = (stage: number): boolean => {
+    if (stage === cfg.stages.length) return true;
+    const cursor = chain[chain.length - 1];
+    for (const i of sorted) {
+      if (used.has(i.id)) continue;
+      if (!cfg.stages[stage].includes(i.rule_id ?? '')) continue;
+      if (
+        Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
+        WINDOW_MS
+      ) {
+        continue;
+      }
+      if (!chain.every((c) => bridgedShareEntity(c, i, bridge))) continue;
+      chain.push(i);
+      used.add(i.id);
+      if (search(stage + 1)) return true;
+      chain.pop();
+      used.delete(i.id);
+    }
+    return false;
+  };
+  return search(1) ? chain : null;
+}
+
+/** sequenceCorrelation variant that bridges IP-only incidents to hosts via the entity graph. */
+function bridgedSequenceCorrelation(
+  cfg: SequenceStageConfig,
+): AttackCorrelationRule {
+  return {
+    id: cfg.id,
+    name: cfg.name,
+    async detect(prisma: PrismaService, since: Date) {
+      const stageRules = cfg.stages.flat();
+      const incidents = await loadIncidents(prisma, since, stageRules);
+      const bridge = await bridgeIpsToHosts(prisma, incidents);
+      const sorted = [...incidents].sort(
+        (a, b) => a.triggered_at.getTime() - b.triggered_at.getTime(),
+      );
+      const results: AttackCorrelationResult[] = [];
+      const fired = new Set<string>();
+
+      for (const start of sorted) {
+        if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
+        const chain = findBridgedChain(start, cfg, sorted, bridge);
+        if (!chain) continue;
+
+        const key = chain.map((c) => c.id).join('|');
+        if (fired.has(key)) continue;
+        fired.add(key);
+
+        const chainIps = [...new Set(chain.flatMap((c) => ipsOf(c)))];
+        const chainUsers = [...new Set(chain.flatMap((c) => usersOf(c)))];
+        const chainHosts = [
+          ...new Set(
+            chain.flatMap((c) => union(hostsOf(c), bridge.get(c.id) ?? [])),
+          ),
+        ];
+        results.push({
+          rule_id: this.id,
+          rule_name: this.name,
+          severity: cfg.severity,
+          confidence_score: cfg.confidence,
+          summary: cfg.summary(chain),
+          related_entities: {
+            ips: chainIps,
+            users: chainUsers,
+            hosts: chainHosts,
+          },
+          prerequisite_incident_ids: chain.map((c) => c.id),
+          response: cfg.response,
+        });
+      }
+      return results;
+    },
+  };
+}
+
+/**
  * C006 — Suspicious administrative account creation (spec §4, MITRE T1136+T1098+T1078)
  * R010 (admin account created) followed by R008 (successful login after
  * failures) for the same account/IP within 30 minutes → disable_account CONFIRM.
@@ -421,6 +566,63 @@ const RansomwarePreparationRule = sequenceCorrelation({
   response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
 });
 
+/**
+ * C004 — Data staging followed by exfiltration (spec §4, MITRE T1074+T1041)
+ * R008 (successful access) → R025 (unusual staging) → R003 (outbound flow
+ * volume) sharing entities within 30 minutes → isolate with confirmation.
+ * The spec's directory-enumeration step has no dedicated rule yet; access +
+ * staging + transfer is the provable chain.
+ */
+const StagingToExfiltrationRule = bridgedSequenceCorrelation({
+  id: 'C004',
+  name: 'Data Staging and Exfiltration Chain',
+  stages: [['R008'], ['R025'], ['R003']],
+  severity: 'HIGH',
+  confidence: 85,
+  summary: (chain) =>
+    `Exfiltration sequence: access (${chain[0].rule_id}) → staging ` +
+    `(${chain[1].rule_id}) → outbound transfer (${chain[2].rule_id}) ` +
+    `within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
+/**
+ * C005 — Defense evasion followed by exfiltration (spec §4, MITRE T1562+T1070+T1041)
+ * R018 (security tools disabled) → R019 (firewall modified) or R004 (logs
+ * cleared) → R003 (outbound flow volume) → CRITICAL, isolate CONFIRM.
+ */
+const DefenseEvasionToExfilRule = bridgedSequenceCorrelation({
+  id: 'C005',
+  name: 'Defense Evasion to Exfiltration Chain',
+  stages: [['R018'], ['R019', 'R004'], ['R003']],
+  severity: 'CRITICAL',
+  confidence: 88,
+  summary: (chain) =>
+    `Exfiltration after defense evasion: ${chain[0].rule_id} → ` +
+    `${chain[1].rule_id} → outbound transfer (${chain[2].rule_id}) ` +
+    `within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
+/**
+ * C009 — Internal recon followed by abnormal transfer (spec §4, MITRE T1018+T1046+T1041)
+ * R021 (internal discovery) → R005 (reconnaissance/scan) → R003 (outbound
+ * flow volume). Database-connection and query-anomaly steps have no
+ * telemetry yet; this correlates the provable recon → transfer chain.
+ */
+const ReconToDataTransferRule = bridgedSequenceCorrelation({
+  id: 'C009',
+  name: 'Internal Recon to Data Transfer Chain',
+  stages: [['R021'], ['R005'], ['R003']],
+  severity: 'HIGH',
+  confidence: 80,
+  summary: (chain) =>
+    `Recon-to-exfil sequence: internal discovery (${chain[0].rule_id}) → ` +
+    `scan (${chain[1].rule_id}) → abnormal outbound transfer ` +
+    `(${chain[2].rule_id}) within 30 minutes`,
+  response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+});
+
 export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   new ReconToAccessRule(),
   new BruteForceToCompromiseRule(),
@@ -429,4 +631,7 @@ export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   MalwareToPersistenceRule,
   CredentialTheftToLateralRule,
   RansomwarePreparationRule,
+  StagingToExfiltrationRule,
+  DefenseEvasionToExfilRule,
+  ReconToDataTransferRule,
 ];

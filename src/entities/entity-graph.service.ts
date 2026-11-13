@@ -76,6 +76,11 @@ export class EntityGraphService {
    *   IP → HOST  CONTACTED        (any event with source_ip + hostname)
    *   IP → USER  USED_ACCOUNT     (auth-ish events with user_principal)
    *   USER → HOST AUTHENTICATED_ON (auth-ish events)
+   *
+   * Firewall events are excluded from IP → HOST edges: their hostname is
+   * the reporting firewall, not the host the IP belongs to, so linking
+   * observed IPs to it would pollute the graph and let attack correlations
+   * chain unrelated hosts through the firewall's name.
    */
   async recordEdges(incidentId: string, ruleId: string): Promise<void> {
     const events = await this.prisma.incidentEvent.findMany({
@@ -92,8 +97,11 @@ export class EntityGraphService {
       const user = ev.user_principal;
       const isAuth = !!ev.action && AUTH_ACTIONS.test(ev.action);
 
+      const isFirewallReport = ev.source_type === 'firewall';
       const pairs: Array<[string, string, string, string, string] | null> = [
-        ip && host ? ['IP', ip, 'HOST', host, 'CONTACTED'] : null,
+        ip && host && !isFirewallReport
+          ? ['IP', ip, 'HOST', host, 'CONTACTED']
+          : null,
         ip && user && isAuth ? ['IP', ip, 'USER', user, 'USED_ACCOUNT'] : null,
         user && host && isAuth
           ? ['USER', user, 'HOST', host, 'AUTHENTICATED_ON']

@@ -35,6 +35,10 @@ export interface NormalizedLog {
   raw_message: string;
   /** Process image name (e.g. from Windows 4688 NewProcessName) */
   process_name?: string;
+  /** Payload bytes for flow-summary telemetry (exfil corroboration) */
+  bytes_sent?: number;
+  /** Direction relative to the reporting host: outbound/inbound */
+  direction?: string;
   /** Full command line of the process (when the source provides it) */
   command_line?: string;
   /** DNS domain queried/resolved (dnsmasq/unbound resolver logs) */

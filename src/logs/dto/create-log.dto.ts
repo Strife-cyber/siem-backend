@@ -76,6 +76,15 @@ export class CreateLogDto {
   @IsString()
   file_operation?: string;
 
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bytes_sent?: number;
+
+  @IsOptional()
+  @IsString()
+  direction?: string;
+
   @IsInt()
   @Min(0)
   @Max(7)

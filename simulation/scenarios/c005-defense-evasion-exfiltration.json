@@ -1,0 +1,898 @@
+{
+  "name": "c005-defense-evasion-exfiltration",
+  "description": "C005 (T1562+T1070+T1041): login bridge (R008) \u2192 Defender stopped (R018) \u2192 firewall rule added (R019) \u2192 13MB outbound flow (R003). Expects C005 CRITICAL, isolate_endpoint CONFIRM.",
+  "base_time": "2026-11-13T13:00:00Z",
+  "requires_rules": [
+    "R008",
+    "R018",
+    "R019",
+    "R003",
+    "C005"
+  ],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "srv-dc-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 12 10:01:00 srv-dc-01 sshd[4110]: Failed password for admin from 10.1.0.5 port 52000 ssh2"
+        },
+        {
+          "offset_seconds": 1,
+          "raw": "Nov 12 10:01:01 srv-dc-01 sshd[4111]: Failed password for admin from 10.1.0.5 port 52001 ssh2"
+        },
+        {
+          "offset_seconds": 2,
+          "raw": "Nov 12 10:01:02 srv-dc-01 sshd[4112]: Failed password for admin from 10.1.0.5 port 52002 ssh2"
+        },
+        {
+          "offset_seconds": 3,
+          "raw": "Nov 12 10:01:03 srv-dc-01 sshd[4113]: Failed password for admin from 10.1.0.5 port 52003 ssh2"
+        },
+        {
+          "offset_seconds": 4,
+          "raw": "Nov 12 10:01:04 srv-dc-01 sshd[4114]: Failed password for admin from 10.1.0.5 port 52004 ssh2"
+        },
+        {
+          "offset_seconds": 5,
+          "raw": "Nov 12 10:01:05 srv-dc-01 sshd[4115]: Failed password for admin from 10.1.0.5 port 52005 ssh2"
+        },
+        {
+          "offset_seconds": 6,
+          "raw": "Nov 12 10:01:06 srv-dc-01 sshd[4116]: Accepted password for admin from 10.1.0.5 port 52006 ssh2"
+        }
+      ]
+    },
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "srv-dc-01",
+      "lines": [
+        {
+          "offset_seconds": 100,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Service Control Manager\"/><EventID>7036</EventID></System><EventData><Data Name=\"param1\">stopped</Data><Data Name=\"param2\">WinDefend</Data></EventData></Event>"
+        }
+      ]
+    },
+    {
+      "source_type": "WINDOWS_NETWORK",
+      "hostname": "srv-dc-01",
+      "lines": [
+        {
+          "offset_seconds": 110,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>2004</EventID></System><EventData><Data Name=\"SubjectUserName\">admin</Data><Data Name=\"RuleName\">Allow inbound TCP 4444</Data><Data Name=\"Direction\">Inbound</Data><Data Name=\"Action\">Allow</Data></EventData></Event>"
+        }
+      ]
+    },
+    {
+      "source_type": "FIREWALL",
+      "hostname": "pfsense",
+      "lines": [
+        {
+          "offset_seconds": 200,
+          "raw": "<134>Nov 13 12:03:20 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 201,
+          "raw": "<134>Nov 13 12:03:21 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 202,
+          "raw": "<134>Nov 13 12:03:22 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 203,
+          "raw": "<134>Nov 13 12:03:23 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 204,
+          "raw": "<134>Nov 13 12:03:24 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 205,
+          "raw": "<134>Nov 13 12:03:25 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 206,
+          "raw": "<134>Nov 13 12:03:26 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 207,
+          "raw": "<134>Nov 13 12:03:27 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 208,
+          "raw": "<134>Nov 13 12:03:28 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 209,
+          "raw": "<134>Nov 13 12:03:29 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 210,
+          "raw": "<134>Nov 13 12:03:30 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 211,
+          "raw": "<134>Nov 13 12:03:31 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 212,
+          "raw": "<134>Nov 13 12:03:32 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 213,
+          "raw": "<134>Nov 13 12:03:33 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 214,
+          "raw": "<134>Nov 13 12:03:34 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 215,
+          "raw": "<134>Nov 13 12:03:35 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 216,
+          "raw": "<134>Nov 13 12:03:36 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 217,
+          "raw": "<134>Nov 13 12:03:37 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 218,
+          "raw": "<134>Nov 13 12:03:38 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 219,
+          "raw": "<134>Nov 13 12:03:39 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 220,
+          "raw": "<134>Nov 13 12:03:40 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 221,
+          "raw": "<134>Nov 13 12:03:41 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 222,
+          "raw": "<134>Nov 13 12:03:42 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 223,
+          "raw": "<134>Nov 13 12:03:43 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 224,
+          "raw": "<134>Nov 13 12:03:44 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 225,
+          "raw": "<134>Nov 13 12:03:45 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 226,
+          "raw": "<134>Nov 13 12:03:46 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 227,
+          "raw": "<134>Nov 13 12:03:47 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 228,
+          "raw": "<134>Nov 13 12:03:48 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 229,
+          "raw": "<134>Nov 13 12:03:49 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 230,
+          "raw": "<134>Nov 13 12:03:50 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 231,
+          "raw": "<134>Nov 13 12:03:51 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 232,
+          "raw": "<134>Nov 13 12:03:52 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 233,
+          "raw": "<134>Nov 13 12:03:53 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 234,
+          "raw": "<134>Nov 13 12:03:54 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 235,
+          "raw": "<134>Nov 13 12:03:55 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 236,
+          "raw": "<134>Nov 13 12:03:56 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 237,
+          "raw": "<134>Nov 13 12:03:57 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 238,
+          "raw": "<134>Nov 13 12:03:58 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 239,
+          "raw": "<134>Nov 13 12:03:59 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 240,
+          "raw": "<134>Nov 13 12:04:00 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 241,
+          "raw": "<134>Nov 13 12:04:01 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 242,
+          "raw": "<134>Nov 13 12:04:02 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 243,
+          "raw": "<134>Nov 13 12:04:03 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 244,
+          "raw": "<134>Nov 13 12:04:04 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 245,
+          "raw": "<134>Nov 13 12:04:05 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 246,
+          "raw": "<134>Nov 13 12:04:06 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 247,
+          "raw": "<134>Nov 13 12:04:07 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 248,
+          "raw": "<134>Nov 13 12:04:08 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 249,
+          "raw": "<134>Nov 13 12:04:09 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 250,
+          "raw": "<134>Nov 13 12:04:10 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 251,
+          "raw": "<134>Nov 13 12:04:11 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 252,
+          "raw": "<134>Nov 13 12:04:12 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 253,
+          "raw": "<134>Nov 13 12:04:13 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 254,
+          "raw": "<134>Nov 13 12:04:14 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 255,
+          "raw": "<134>Nov 13 12:04:15 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 256,
+          "raw": "<134>Nov 13 12:04:16 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 257,
+          "raw": "<134>Nov 13 12:04:17 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 258,
+          "raw": "<134>Nov 13 12:04:18 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 259,
+          "raw": "<134>Nov 13 12:04:19 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 260,
+          "raw": "<134>Nov 13 12:04:20 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 261,
+          "raw": "<134>Nov 13 12:04:21 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 262,
+          "raw": "<134>Nov 13 12:04:22 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 263,
+          "raw": "<134>Nov 13 12:04:23 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 264,
+          "raw": "<134>Nov 13 12:04:24 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 265,
+          "raw": "<134>Nov 13 12:04:25 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 266,
+          "raw": "<134>Nov 13 12:04:26 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 267,
+          "raw": "<134>Nov 13 12:04:27 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 268,
+          "raw": "<134>Nov 13 12:04:28 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 269,
+          "raw": "<134>Nov 13 12:04:29 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 270,
+          "raw": "<134>Nov 13 12:04:30 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 271,
+          "raw": "<134>Nov 13 12:04:31 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 272,
+          "raw": "<134>Nov 13 12:04:32 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 273,
+          "raw": "<134>Nov 13 12:04:33 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 274,
+          "raw": "<134>Nov 13 12:04:34 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 275,
+          "raw": "<134>Nov 13 12:04:35 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 276,
+          "raw": "<134>Nov 13 12:04:36 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 277,
+          "raw": "<134>Nov 13 12:04:37 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 278,
+          "raw": "<134>Nov 13 12:04:38 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 279,
+          "raw": "<134>Nov 13 12:04:39 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 280,
+          "raw": "<134>Nov 13 12:04:40 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 281,
+          "raw": "<134>Nov 13 12:04:41 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 282,
+          "raw": "<134>Nov 13 12:04:42 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 283,
+          "raw": "<134>Nov 13 12:04:43 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 284,
+          "raw": "<134>Nov 13 12:04:44 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 285,
+          "raw": "<134>Nov 13 12:04:45 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 286,
+          "raw": "<134>Nov 13 12:04:46 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 287,
+          "raw": "<134>Nov 13 12:04:47 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 288,
+          "raw": "<134>Nov 13 12:04:48 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 289,
+          "raw": "<134>Nov 13 12:04:49 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 290,
+          "raw": "<134>Nov 13 12:04:50 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 291,
+          "raw": "<134>Nov 13 12:04:51 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 292,
+          "raw": "<134>Nov 13 12:04:52 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 293,
+          "raw": "<134>Nov 13 12:04:53 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 294,
+          "raw": "<134>Nov 13 12:04:54 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 295,
+          "raw": "<134>Nov 13 12:04:55 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 296,
+          "raw": "<134>Nov 13 12:04:56 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 297,
+          "raw": "<134>Nov 13 12:04:57 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 298,
+          "raw": "<134>Nov 13 12:04:58 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 299,
+          "raw": "<134>Nov 13 12:04:59 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 300,
+          "raw": "<134>Nov 13 12:05:00 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 301,
+          "raw": "<134>Nov 13 12:05:01 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 302,
+          "raw": "<134>Nov 13 12:05:02 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 303,
+          "raw": "<134>Nov 13 12:05:03 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 304,
+          "raw": "<134>Nov 13 12:05:04 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 305,
+          "raw": "<134>Nov 13 12:05:05 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 306,
+          "raw": "<134>Nov 13 12:05:06 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 307,
+          "raw": "<134>Nov 13 12:05:07 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 308,
+          "raw": "<134>Nov 13 12:05:08 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 309,
+          "raw": "<134>Nov 13 12:05:09 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 310,
+          "raw": "<134>Nov 13 12:05:10 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 311,
+          "raw": "<134>Nov 13 12:05:11 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 312,
+          "raw": "<134>Nov 13 12:05:12 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 313,
+          "raw": "<134>Nov 13 12:05:13 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 314,
+          "raw": "<134>Nov 13 12:05:14 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 315,
+          "raw": "<134>Nov 13 12:05:15 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 316,
+          "raw": "<134>Nov 13 12:05:16 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 317,
+          "raw": "<134>Nov 13 12:05:17 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 318,
+          "raw": "<134>Nov 13 12:05:18 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 319,
+          "raw": "<134>Nov 13 12:05:19 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 320,
+          "raw": "<134>Nov 13 12:05:20 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 321,
+          "raw": "<134>Nov 13 12:05:21 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 322,
+          "raw": "<134>Nov 13 12:05:22 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 323,
+          "raw": "<134>Nov 13 12:05:23 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 324,
+          "raw": "<134>Nov 13 12:05:24 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 325,
+          "raw": "<134>Nov 13 12:05:25 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 326,
+          "raw": "<134>Nov 13 12:05:26 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 327,
+          "raw": "<134>Nov 13 12:05:27 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 328,
+          "raw": "<134>Nov 13 12:05:28 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 329,
+          "raw": "<134>Nov 13 12:05:29 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 330,
+          "raw": "<134>Nov 13 12:05:30 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 331,
+          "raw": "<134>Nov 13 12:05:31 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 332,
+          "raw": "<134>Nov 13 12:05:32 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 333,
+          "raw": "<134>Nov 13 12:05:33 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 334,
+          "raw": "<134>Nov 13 12:05:34 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 335,
+          "raw": "<134>Nov 13 12:05:35 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 336,
+          "raw": "<134>Nov 13 12:05:36 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 337,
+          "raw": "<134>Nov 13 12:05:37 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 338,
+          "raw": "<134>Nov 13 12:05:38 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 339,
+          "raw": "<134>Nov 13 12:05:39 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 340,
+          "raw": "<134>Nov 13 12:05:40 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 341,
+          "raw": "<134>Nov 13 12:05:41 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 342,
+          "raw": "<134>Nov 13 12:05:42 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 343,
+          "raw": "<134>Nov 13 12:05:43 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 344,
+          "raw": "<134>Nov 13 12:05:44 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 345,
+          "raw": "<134>Nov 13 12:05:45 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 346,
+          "raw": "<134>Nov 13 12:05:46 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 347,
+          "raw": "<134>Nov 13 12:05:47 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 348,
+          "raw": "<134>Nov 13 12:05:48 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 349,
+          "raw": "<134>Nov 13 12:05:49 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 350,
+          "raw": "<134>Nov 13 12:05:50 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 351,
+          "raw": "<134>Nov 13 12:05:51 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 352,
+          "raw": "<134>Nov 13 12:05:52 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 353,
+          "raw": "<134>Nov 13 12:05:53 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 354,
+          "raw": "<134>Nov 13 12:05:54 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 355,
+          "raw": "<134>Nov 13 12:05:55 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 356,
+          "raw": "<134>Nov 13 12:05:56 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 357,
+          "raw": "<134>Nov 13 12:05:57 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 358,
+          "raw": "<134>Nov 13 12:05:58 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 359,
+          "raw": "<134>Nov 13 12:05:59 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 360,
+          "raw": "<134>Nov 13 12:06:00 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 361,
+          "raw": "<134>Nov 13 12:06:01 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 362,
+          "raw": "<134>Nov 13 12:06:02 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 363,
+          "raw": "<134>Nov 13 12:06:03 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 364,
+          "raw": "<134>Nov 13 12:06:04 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 365,
+          "raw": "<134>Nov 13 12:06:05 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 366,
+          "raw": "<134>Nov 13 12:06:06 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 367,
+          "raw": "<134>Nov 13 12:06:07 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 368,
+          "raw": "<134>Nov 13 12:06:08 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 369,
+          "raw": "<134>Nov 13 12:06:09 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 370,
+          "raw": "<134>Nov 13 12:06:10 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 371,
+          "raw": "<134>Nov 13 12:06:11 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 372,
+          "raw": "<134>Nov 13 12:06:12 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 373,
+          "raw": "<134>Nov 13 12:06:13 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 374,
+          "raw": "<134>Nov 13 12:06:14 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 375,
+          "raw": "<134>Nov 13 12:06:15 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 376,
+          "raw": "<134>Nov 13 12:06:16 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 377,
+          "raw": "<134>Nov 13 12:06:17 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 378,
+          "raw": "<134>Nov 13 12:06:18 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 379,
+          "raw": "<134>Nov 13 12:06:19 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 380,
+          "raw": "<134>Nov 13 12:06:20 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 381,
+          "raw": "<134>Nov 13 12:06:21 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 382,
+          "raw": "<134>Nov 13 12:06:22 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 383,
+          "raw": "<134>Nov 13 12:06:23 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 384,
+          "raw": "<134>Nov 13 12:06:24 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 385,
+          "raw": "<134>Nov 13 12:06:25 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 386,
+          "raw": "<134>Nov 13 12:06:26 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 387,
+          "raw": "<134>Nov 13 12:06:27 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 388,
+          "raw": "<134>Nov 13 12:06:28 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 389,
+          "raw": "<134>Nov 13 12:06:29 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 390,
+          "raw": "<134>Nov 13 12:06:30 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 391,
+          "raw": "<134>Nov 13 12:06:31 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 392,
+          "raw": "<134>Nov 13 12:06:32 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 393,
+          "raw": "<134>Nov 13 12:06:33 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 394,
+          "raw": "<134>Nov 13 12:06:34 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 395,
+          "raw": "<134>Nov 13 12:06:35 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 396,
+          "raw": "<134>Nov 13 12:06:36 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 397,
+          "raw": "<134>Nov 13 12:06:37 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 398,
+          "raw": "<134>Nov 13 12:06:38 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        },
+        {
+          "offset_seconds": 399,
+          "raw": "<134>Nov 13 12:06:39 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,6,tcp,1500,10.1.0.5,203.0.113.9,51234,443,65535,S,1000,2000,65535,0,0,,,,,,,,,,,"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R018",
+        "min_severity": "HIGH",
+        "min_count": 1
+      },
+      {
+        "rule_id": "R019",
+        "min_severity": "WARNING",
+        "min_count": 1
+      },
+      {
+        "rule_id": "R003",
+        "min_severity": "CRITICAL",
+        "min_count": 1
+      },
+      {
+        "rule_id": "C005",
+        "min_severity": "CRITICAL",
+        "min_count": 1
+      }
+    ]
+  }
+}

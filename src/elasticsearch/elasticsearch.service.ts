@@ -197,6 +197,11 @@ export class ElasticsearchService implements OnModuleInit {
             type: 'keyword',
             normalizer: 'case_insensitive',
           },
+          bytes_sent: { type: 'long' },
+          direction: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
         },
       });
     } catch (error) {
