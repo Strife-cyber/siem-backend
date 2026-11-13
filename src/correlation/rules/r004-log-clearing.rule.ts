@@ -97,7 +97,7 @@ export class LogClearingRule implements DetectionRule {
             filter: [
               {
                 range: {
-                  collected_at: {
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },
@@ -161,7 +161,7 @@ export class LogClearingRule implements DetectionRule {
         size: 0,
         query: {
           range: {
-            collected_at: {
+            normalized_at: {
               gte: currentSince.toISOString(),
               lte: now.toISOString(),
             },
@@ -178,7 +178,7 @@ export class LogClearingRule implements DetectionRule {
         size: 0,
         query: {
           range: {
-            collected_at: {
+            normalized_at: {
               gte: baselineStart.toISOString(),
               lte: baselineEnd.toISOString(),
             },

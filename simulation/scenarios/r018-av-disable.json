@@ -1,0 +1,36 @@
+{
+  "name": "r018-av-disable",
+  "description": "R018: Windows Defender service stopped (7036). Expects R018 HIGH + isolate_endpoint CONFIRM.",
+  "base_time": "2026-11-12T13:30:00Z",
+  "requires_rules": [
+    "R018"
+  ],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "WIN-SRV-03",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Service Control Manager\"/><EventID>7036</EventID></System><EventData><Data Name=\"param1\">stopped</Data><Data Name=\"param2\">WinDefend</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R018",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_playbook_executions": [
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      }
+    ]
+  }
+}

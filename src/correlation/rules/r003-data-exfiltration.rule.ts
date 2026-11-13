@@ -75,7 +75,7 @@ export class DataExfilRule implements DetectionRule {
               { exists: { field: 'bytes_sent' } },
               {
                 range: {
-                  collected_at: {
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },
@@ -143,7 +143,7 @@ export class DataExfilRule implements DetectionRule {
               { term: { direction: 'outbound' } },
               {
                 range: {
-                  collected_at: {
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },

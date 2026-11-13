@@ -1,0 +1,41 @@
+{
+  "name": "r022-smb-lateral",
+  "description": "R022: one host opens SMB to 4 internal hosts. Expects R022 WARNING.",
+  "base_time": "2026-11-12T13:45:00Z",
+  "requires_rules": [
+    "R022"
+  ],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "PFSENSE-03",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "ALLOW 10.50.0.5 10.50.0.21 52000 445 TCP"
+        },
+        {
+          "offset_seconds": 3,
+          "raw": "ALLOW 10.50.0.5 10.50.0.22 52000 445 TCP"
+        },
+        {
+          "offset_seconds": 6,
+          "raw": "ALLOW 10.50.0.5 10.50.0.23 52000 445 TCP"
+        },
+        {
+          "offset_seconds": 9,
+          "raw": "ALLOW 10.50.0.5 10.50.0.24 52000 445 TCP"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R022",
+        "min_severity": "WARNING",
+        "min_count": 1
+      }
+    ]
+  }
+}

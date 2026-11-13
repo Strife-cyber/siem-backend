@@ -28,8 +28,18 @@ export class ReconnaissanceRule implements DetectionRule {
       'syslog',
       'linux',
     ],
-    actions: ['network_connect', 'network_flow', 'http_request'],
-    outcomes: ['success', 'failure'],
+    // Collector emits firewall_*/connection_state/http_* (lowercased on ingest);
+    // legacy network_* terms kept for older pipelines.
+    actions: [
+      'network_connect',
+      'network_flow',
+      'http_request',
+      'firewall_allow',
+      'firewall_deny',
+      'firewall_event',
+      'connection_state',
+    ],
+    outcomes: [],
     trigger_playbook: 'temporary_block',
     playbook_mode: 'AUTO',
   };
@@ -52,7 +62,9 @@ export class ReconnaissanceRule implements DetectionRule {
               { terms: { action: this.definition.actions! } },
               {
                 range: {
-                  collected_at: {
+                  // Gate on ingestion time, not event time: replayed/backdated
+                  // logs would otherwise be skipped forever by lastRun.
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },

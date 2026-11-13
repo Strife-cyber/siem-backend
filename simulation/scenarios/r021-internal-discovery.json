@@ -1,0 +1,61 @@
+{
+  "name": "r021-internal-discovery",
+  "description": "R021: one host sweeps 8 internal destinations on port 80. Expects R021 WARNING, no R005 (single port).",
+  "base_time": "2026-11-12T13:40:00Z",
+  "requires_rules": [
+    "R005",
+    "R021"
+  ],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "PFSENSE-02",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "ALLOW 10.30.0.5 10.30.0.11 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 2,
+          "raw": "ALLOW 10.30.0.5 10.30.0.12 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 4,
+          "raw": "ALLOW 10.30.0.5 10.30.0.13 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 6,
+          "raw": "ALLOW 10.30.0.5 10.30.0.14 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 8,
+          "raw": "ALLOW 10.30.0.5 10.30.0.15 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "ALLOW 10.30.0.5 10.30.0.16 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 12,
+          "raw": "ALLOW 10.30.0.5 10.30.0.17 51000 80 TCP"
+        },
+        {
+          "offset_seconds": 14,
+          "raw": "ALLOW 10.30.0.5 10.30.0.18 51000 80 TCP"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R021",
+        "min_severity": "WARNING",
+        "min_count": 1
+      }
+    ],
+    "expect_no_incidents_for_rules": [
+      "R005"
+    ]
+  }
+}
