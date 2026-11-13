@@ -123,14 +123,15 @@ them with real lab captures:
 This keeps the proof chain honest: real collector format in, real backend
 pipeline out.
 
-## Phase 2 deferred rules (telemetry gaps)
+## Deferred rules & correlations (telemetry gaps)
 
 - **R009 Impossible Travel** — needs a GeoIP database; the collector emits no geo fields and no GeoIP service is configured. Deferred until geo enrichment exists.
-- **R012 Linux Shell Abuse** — IMPLEMENTED (auditd EXECVE telemetry from siem-collector). Detects reverse shells, download-and-execute cradles and encoded payloads in auditd `command_line`.
-- **R016 SSH Persistence (authorized_keys)** — IMPLEMENTED (auditd PATH records from siem-collector). Matches any `authorized_keys` file access.
-- **R024 DNS Tunneling** — IMPLEMENTED (dnsmasq/unbound DNS telemetry from siem-collector). High volume + long/high-entropy domain names.
-- **C004/C005/C009** — still deferred: user-attributed `bytes_out` telemetry does not exist yet.
-- **R019 Firewall Modification** — collector has no firewall *configuration-change* events (only allow/deny traffic events).
-- **R024 DNS Tunneling** — no DNS telemetry collected.
-- **R025 Unusual Data Staging** — needs file-operation/content visibility the collector does not provide.
-- **C004 / C005 / C009** — these sequences require a proven data-exfiltration Layer-1 signal; R003 needs user-attributed outbound byte telemetry (`bytes_sent`) the collector does not emit, so the chains cannot be simulation-proven yet.
+- **R019 Firewall Modification** — the collector has no firewall *configuration-change* parser yet (pfSense config changes are not in filterlog; Windows 2004–2009 rule-change events are collected but not classified). Deferred until a config-change signal is normalized.
+- **C004 / C005 / C009** — deferred: all three chains end in a data-exfiltration signal, and R003 needs per-user/per-flow outbound byte telemetry (`bytes_sent`) that no current collector source provides. pfSense filterlog carries only per-packet payload lengths (no cumulative bytes, no user attribution); honest per-flow bytes would need conntrack collection (new collector work). The chains cannot be simulation-proven until then.
+
+## Implemented deferred rules (telemetry now available)
+
+- **R012 Linux Shell Abuse** — auditd EXECVE telemetry (siem-collector): reverse shells, download-and-execute cradles, encoded payloads in `command_line`.
+- **R016 SSH Persistence (authorized_keys)** — auditd PATH records: any `authorized_keys` file access.
+- **R024 DNS Tunneling** — dnsmasq/unbound resolver telemetry: high volume + long/high-entropy domain names, aggregated per registered domain.
+- **R025 Unusual Data Staging** — auditd PATH / Windows 4663 file operations: bursts of archive-file creation on one host. Content-level staging (reading sensitive files) still needs FIM/content telemetry; this detects the archive-aggregation signal.

@@ -31,7 +31,8 @@
     "R021",
     "R022",
     "R023",
-    "R024"
+    "R024",
+    "R025"
   ],
   "sources": [
     {
@@ -141,6 +142,18 @@
         {
           "offset_seconds": 40,
           "raw": "type=PATH msg=audit(1763036440.100:4001): item=0 name=\"/home/deploy/app.log\" nametype=CREATE mode=0100644 ouid=1002 ogid=1002 rdev=00:00"
+        },
+        {
+          "offset_seconds": 50,
+          "raw": "type=PATH msg=audit(1763036460.100:4010): item=0 name=\"/var/log/nginx/access.log\" nametype=CREATE mode=0100644 ouid=1002 ogid=1002 rdev=00:00"
+        },
+        {
+          "offset_seconds": 60,
+          "raw": "type=PATH msg=audit(1763036460.100:4020): item=0 name=\"/home/deploy/public/index.html\" nametype=CREATE mode=0100644 ouid=1002 ogid=1002 rdev=00:00"
+        },
+        {
+          "offset_seconds": 70,
+          "raw": "type=PATH msg=audit(1763036460.100:4030): item=0 name=\"/tmp/session-cache.dat\" nametype=CREATE mode=0100644 ouid=1002 ogid=1002 rdev=00:00"
         }
       ]
     },
