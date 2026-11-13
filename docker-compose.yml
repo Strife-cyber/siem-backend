@@ -122,6 +122,10 @@ services:
       PFSENSE_API_KEY: 0ee670fbb746a2de16bae58c3775d088
       PFSENSE_TIMEOUT: '10000'
       PFSENSE_REJECT_UNAUTHORIZED: 'false'
+      # FortiGate SOAR agent (set SOAR_FIREWALL_PROVIDER=fortigate to use it)
+      FORTIGATE_URL: https://192.168.37.136
+      FORTIGATE_API_TOKEN: ''
+      FORTIGATE_TIMEOUT: '10000'
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: '587'
       SMTP_USER: dunamisjunior15@gmail.com
