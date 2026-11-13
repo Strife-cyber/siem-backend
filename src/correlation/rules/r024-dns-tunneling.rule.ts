@@ -1,3 +1,4 @@
+import { getDomain } from 'tldts';
 import type { ElasticsearchService } from '../../elasticsearch/elasticsearch.service';
 import type {
   DetectionResult,
@@ -60,18 +61,30 @@ function toPayload(e: Hit): IncidentEventPayload {
 }
 
 /**
- * Parent (registered) domain of a hostname: the last two labels. DNS
- * tunneling encodes data in unique subdomains of one attacker domain, so
- * volume must be aggregated per parent, not per exact query name.
+ * Registered domain (eTLD+1) of a query name via the public suffix list.
+ * DNS tunneling encodes data in unique subdomains of one attacker domain,
+ * so volume must be aggregated per registered domain — not per exact query
+ * name, and not by naive "last two labels" (which merges every `*.co.uk`
+ * into one group). Names with over-long labels (invalid per DNS but seen
+ * in attacker tooling) make the PSL parser reject the whole name, so
+ * invalid leftmost labels are stripped until the registered domain
+ * resolves; the last-two-labels heuristic is only a last resort.
  */
-function parentDomain(domain: string): string {
-  const labels = domain.split('.').filter(Boolean);
-  if (labels.length <= 2) return domain;
-  return labels.slice(-2).join('.');
+export function registeredDomain(name: string): string {
+  let candidate = name;
+  for (let i = 0; i < 5; i++) {
+    const domain = getDomain(candidate);
+    if (domain) return domain;
+    const dot = candidate.indexOf('.');
+    if (dot === -1) break;
+    candidate = candidate.slice(dot + 1);
+  }
+  const labels = name.split('.').filter(Boolean);
+  return labels.length <= 2 ? name : labels.slice(-2).join('.');
 }
 
 /** Shannon entropy (bits/char) of a string. */
-function shannonEntropy(s: string): number {
+export function shannonEntropy(s: string): number {
   const freq = new Map<string, number>();
   for (const ch of s) freq.set(ch, (freq.get(ch) ?? 0) + 1);
   let entropy = 0;
@@ -90,9 +103,9 @@ function shannonEntropy(s: string): number {
  * enough: a domain is suspicious only when it combines high volume with
  * either a very long name or high character entropy.
  *
- * Tunneling rotates a unique label per query under one parent domain, so
- * volume is aggregated per parent domain while length/entropy are checked
- * on the full queried names within the group.
+ * Tunneling rotates a unique label per query under one registered domain,
+ * so volume is aggregated per registered domain (public-suffix aware) while
+ * length/entropy are checked on the full queried names within the group.
  *
  * Requires resolver telemetry (dnsmasq/unbound) — see siem-collector#6.
  * Alert-only: the spec calls for `block_domain` CONFIRM, but no such SOAR
@@ -119,17 +132,17 @@ export class DnsTunnelingRule implements DetectionRule {
   ): Promise<DetectionResult[]> {
     const events = await fetchDnsQueries(es, since);
 
-    const byParent = new Map<string, Hit[]>();
+    const byDomain = new Map<string, Hit[]>();
     for (const e of events) {
       const d = e.domain;
       if (!d) continue;
-      const parent = parentDomain(d);
-      const list = byParent.get(parent) ?? [];
+      const parent = registeredDomain(d);
+      const list = byDomain.get(parent) ?? [];
       list.push(e);
-      byParent.set(parent, list);
+      byDomain.set(parent, list);
     }
 
-    const suspicious = [...byParent.entries()]
+    const suspicious = [...byDomain.entries()]
       .map(([parent, evs]) => {
         const maxNameLength = Math.max(...evs.map((e) => e.domain!.length));
         const maxEntropy = Math.max(

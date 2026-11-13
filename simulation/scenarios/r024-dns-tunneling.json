@@ -12,131 +12,131 @@
       "lines": [
         {
           "offset_seconds": 0,
-          "raw": "Nov 13 11:00:00 srv-dns-01 dnsmasq[1234]: query[A] ahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkr.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:00 srv-dns-01 dnsmasq[1234]: query[A] 0v6rast5j284wv98y3umpyo0cu4yyj5ci6vg2g73aj0je4qvzfv8yu58ceps.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 10,
-          "raw": "Nov 13 11:00:01 srv-dns-01 dnsmasq[1234]: query[A] lszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovc.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:01 srv-dns-01 dnsmasq[1234]: query[A] 1hspthdp03eh58b6pjs1awp0lf7xe78669by4cyxqbwewpgvicw8vl34lie3.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 20,
-          "raw": "Nov 13 11:00:02 srv-dns-01 dnsmasq[1234]: query[A] wdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgn.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:02 srv-dns-01 dnsmasq[1234]: query[A] 3sy670kmiqd4x9g7hsfkr26j1fo2wb0dz6xpyfxobugvjics4i42afbqnj97.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 30,
-          "raw": "Nov 13 11:00:03 srv-dns-01 dnsmasq[1234]: query[A] hovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkry.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:03 srv-dns-01 dnsmasq[1234]: query[A] 4awty088o5or15byvzk3i8bzbf1i3ldqyun3uvyr0qf4b8dwoecbpmbjpi4h.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 40,
-          "raw": "Nov 13 11:00:04 srv-dns-01 dnsmasq[1234]: query[A] szgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcj.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:04 srv-dns-01 dnsmasq[1234]: query[A] 5bfz63pnwdds54s8ag1iqxzxczd9mx9sey629rhigzxv9xjm6z6ccciv473j.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 50,
-          "raw": "Nov 13 11:00:05 srv-dns-01 dnsmasq[1234]: query[A] dkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnu.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:05 srv-dns-01 dnsmasq[1234]: query[A] 5sowomqigct2cxifsu0lmi8x76rkq4svh3ejoz9xfzaq8h3xqyxgo4b9uoe3.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 60,
-          "raw": "Nov 13 11:00:06 srv-dns-01 dnsmasq[1234]: query[A] ovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryf.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:06 srv-dns-01 dnsmasq[1234]: query[A] 6kbj2ciepxxycj2xx2ei7xzurphbl57y9hqq2ns5mhie2l2fuwe98stklx6o.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 70,
-          "raw": "Nov 13 11:00:07 srv-dns-01 dnsmasq[1234]: query[A] zgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjq.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:07 srv-dns-01 dnsmasq[1234]: query[A] 8mx1evuht6t0uzs9im0yltz9atsn1u322n64kfs6vfptomjbcp4e30my5zpj.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 80,
-          "raw": "Nov 13 11:00:08 srv-dns-01 dnsmasq[1234]: query[A] kryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnub.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:08 srv-dns-01 dnsmasq[1234]: query[A] 8qlhbiawpublqdi07he42x6g26oc7t3bd4z1g52efujeir9uy7s361gh9n12.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 90,
-          "raw": "Nov 13 11:00:09 srv-dns-01 dnsmasq[1234]: query[A] vcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfm.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:09 srv-dns-01 dnsmasq[1234]: query[A] 9c3fuquhz6a830dm7x52dnr9is25hbpkt9a90foh3hj5s6r044p39jym6ier.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 100,
-          "raw": "Nov 13 11:00:10 srv-dns-01 dnsmasq[1234]: query[A] gnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqx.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:10 srv-dns-01 dnsmasq[1234]: query[A] ag1ol73d9ph3i379u26192k42qpr75pr2esprvu8fijoyjne00v830dn0yby.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 110,
-          "raw": "Nov 13 11:00:11 srv-dns-01 dnsmasq[1234]: query[A] ryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubi.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:11 srv-dns-01 dnsmasq[1234]: query[A] cbfcqn0b58st4pzt3edk2043nvjuuwzix69gup3hr2pjgdsy0pkuumk5635t.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 120,
-          "raw": "Nov 13 11:00:12 srv-dns-01 dnsmasq[1234]: query[A] cjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmt.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:12 srv-dns-01 dnsmasq[1234]: query[A] csmcmcut6z84qcmswdvrhx1z2yvl55x7rf1f1l8sugfust21k2w2cw1rdezx.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 130,
-          "raw": "Nov 13 11:00:13 srv-dns-01 dnsmasq[1234]: query[A] nubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxe.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:13 srv-dns-01 dnsmasq[1234]: query[A] dkyayq3s195jmsnd8dudd467kd6fleepzhpcf07uqnupqzit3uea3ge8n6qi.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 140,
-          "raw": "Nov 13 11:00:14 srv-dns-01 dnsmasq[1234]: query[A] yfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubip.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:14 srv-dns-01 dnsmasq[1234]: query[A] hbrpoig8f1cbfno6b9m80o2rak1vrjnvgfygwwqc38hyf9sxmecosfogyr3x.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 150,
-          "raw": "Nov 13 11:00:15 srv-dns-01 dnsmasq[1234]: query[A] jqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmta.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:15 srv-dns-01 dnsmasq[1234]: query[A] hmip5bx9x39ifetz4700eiue237wi9li16dh7jtkkuow7sfqm9rit8f6kjkv.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 160,
-          "raw": "Nov 13 11:00:16 srv-dns-01 dnsmasq[1234]: query[A] ubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxel.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:16 srv-dns-01 dnsmasq[1234]: query[A] j2e42trdw6et32cdxsef6y39c2mu46jd2gvf6lcp2277kxxsy0vdvevg9ysq.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 170,
-          "raw": "Nov 13 11:00:17 srv-dns-01 dnsmasq[1234]: query[A] fmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipw.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:17 srv-dns-01 dnsmasq[1234]: query[A] jvfjwtzift9yvi7f16xbxtlnv5moijesg687cviyjklk2c0xp2s2o8pt4mx2.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 180,
-          "raw": "Nov 13 11:00:18 srv-dns-01 dnsmasq[1234]: query[A] qxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtah.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:18 srv-dns-01 dnsmasq[1234]: query[A] kxwnrek8pk3yr9oudocuzrenun5z3jqip98q1zxoi65fdhjk1eyy37q9ah8r.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 190,
-          "raw": "Nov 13 11:00:19 srv-dns-01 dnsmasq[1234]: query[A] bipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxels.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:19 srv-dns-01 dnsmasq[1234]: query[A] ljzejbf7ny03vkxtufdjkdfr21520rn6hw1hs57tcozdantniqsuha51liy8.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 200,
-          "raw": "Nov 13 11:00:20 srv-dns-01 dnsmasq[1234]: query[A] mtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwd.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:20 srv-dns-01 dnsmasq[1234]: query[A] n3qxkhktgbtyzmepgthcw81xe6va05g1x3j1l7r8431rupfr2p3yvb5ul5nw.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 210,
-          "raw": "Nov 13 11:00:21 srv-dns-01 dnsmasq[1234]: query[A] xelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtaho.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:21 srv-dns-01 dnsmasq[1234]: query[A] o0v3z0gu1uqxj4efff1gxi9d99vh0w1dstwg6nj4ogw9xhro199brblrtvwa.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 220,
-          "raw": "Nov 13 11:00:22 srv-dns-01 dnsmasq[1234]: query[A] ipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelsz.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:22 srv-dns-01 dnsmasq[1234]: query[A] o69wezc1b3eu1z0shzbuk3xf1gp1z7fztvovke6h76mwwjpgjqmljel532uu.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 230,
-          "raw": "Nov 13 11:00:23 srv-dns-01 dnsmasq[1234]: query[A] tahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdk.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:23 srv-dns-01 dnsmasq[1234]: query[A] oaedoecve6pr5n8i4p40mgg1w103dgdzvgpmm82i1lr3pe29gd8afpk054nz.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 240,
-          "raw": "Nov 13 11:00:24 srv-dns-01 dnsmasq[1234]: query[A] elszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahov.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:24 srv-dns-01 dnsmasq[1234]: query[A] of1gg2ktbcudswx1jp70lklfyp5jo3q3qa3s8ke2wt1q3tmy4gpywssbzrad.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 250,
-          "raw": "Nov 13 11:00:25 srv-dns-01 dnsmasq[1234]: query[A] pwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszg.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:25 srv-dns-01 dnsmasq[1234]: query[A] pgw90jpkl0blv0prkgyc4om3wtoobmzvrerw6z8vbhqlqcg1wu16hymqc1a7.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 260,
-          "raw": "Nov 13 11:00:26 srv-dns-01 dnsmasq[1234]: query[A] ahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkr.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:26 srv-dns-01 dnsmasq[1234]: query[A] qvrr9a7mfp059p452bfsozptx497w19vw3rtqohmuh8lmn4r7sgmsoxlta8i.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 270,
-          "raw": "Nov 13 11:00:27 srv-dns-01 dnsmasq[1234]: query[A] lszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovc.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:27 srv-dns-01 dnsmasq[1234]: query[A] rcd9si5gas442vldq4hez5edjjtfph90o7y22t1tdgnnqfkpl9eka024scos.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 280,
-          "raw": "Nov 13 11:00:28 srv-dns-01 dnsmasq[1234]: query[A] wdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgn.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:28 srv-dns-01 dnsmasq[1234]: query[A] s3eoqm1h8ojrjedkts2h3tzr6852fc1uqbfobrcl472rl15f4w0vugkv05sz.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 290,
-          "raw": "Nov 13 11:00:29 srv-dns-01 dnsmasq[1234]: query[A] hovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkry.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:29 srv-dns-01 dnsmasq[1234]: query[A] t0hicct5hgp8iy3x80j0g50rcxn22pxgx8wdzrmh3fnbdvpine9nnovjarji.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 300,
-          "raw": "Nov 13 11:00:30 srv-dns-01 dnsmasq[1234]: query[A] szgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcj.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:30 srv-dns-01 dnsmasq[1234]: query[A] vhs1k3aq6l6gt6mjxk87au5bhxtpdpff5e8ii49kq71n8mtzx272hpoevb9o.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 310,
-          "raw": "Nov 13 11:00:31 srv-dns-01 dnsmasq[1234]: query[A] dkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnu.exfil.evil-corp.com from 10.0.0.5"
+          "raw": "Nov 13 11:00:31 srv-dns-01 dnsmasq[1234]: query[A] wepxsk28t7a9tgiqhg9jrsnvnq65qdf1rcaviqk2919ahej8cx9j1ictxcwn.exfil.evil-corp.com from 10.0.0.5"
         },
         {
           "offset_seconds": 330,
