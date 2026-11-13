@@ -76,6 +76,10 @@ export class DataExfilRule implements DetectionRule {
               { terms: { source_type: this.definition.source_types! } },
               { term: { direction: 'outbound' } },
               { exists: { field: 'bytes_sent' } },
+              // Flow summaries are handled by detectByFlowBytes; without
+              // this guard the same bytes would be counted twice once flow
+              // telemetry carries a user_principal.
+              { bool: { must_not: { term: { action: 'flow_bytes' } } } },
               {
                 range: {
                   normalized_at: {
