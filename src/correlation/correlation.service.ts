@@ -29,6 +29,7 @@ import {
   SudoAbuseRule,
   ScheduledTaskRule,
 } from './rules/r010-r015-host-monitoring.rules';
+import { LinuxShellAbuseRule } from './rules/r012-linux-shell-abuse.rule';
 import { ATTACK_CORRELATION_RULES } from './rules/attack-correlation.rules';
 import type {
   DetectionRule,
@@ -82,6 +83,7 @@ export class CorrelationService {
     new InternalDiscoveryRule(),
     new SmbLateralMovementRule(),
     new RdpLateralMovementRule(),
+    new LinuxShellAbuseRule(),
   ];
 
   /** Layer-2 attack correlation rules (C001–C003) — run after event rules */

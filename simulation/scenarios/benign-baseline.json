@@ -3,6 +3,13 @@
   "description": "Gate scenario: a day of normal office activity (successful SSH logins, a couple of isolated failed logins below the R001 threshold, routine nginx web traffic, syslog noise). Must produce zero HIGH/CRITICAL incidents and no SOAR actions.",
   "base_time": "2026-11-12T08:00:00Z",
   "requires_rules": [
+    "C001",
+    "C002",
+    "C003",
+    "C006",
+    "C007",
+    "C008",
+    "C010",
     "R001",
     "R002",
     "R003",
@@ -13,6 +20,7 @@
     "R008",
     "R010",
     "R011",
+    "R012",
     "R013",
     "R014",
     "R015",
@@ -21,14 +29,7 @@
     "R020",
     "R021",
     "R022",
-    "R023",
-    "C001",
-    "C002",
-    "C003",
-    "C006",
-    "C007",
-    "C008",
-    "C010"
+    "R023"
   ],
   "sources": [
     {
