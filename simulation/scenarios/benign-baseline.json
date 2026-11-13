@@ -1,0 +1,51 @@
+{
+  "name": "benign-baseline",
+  "description": "Gate scenario: a day of normal office activity (successful SSH logins, a couple of isolated failed logins below the R001 threshold, routine nginx web traffic, syslog noise). Must produce zero HIGH/CRITICAL incidents and no SOAR actions.",
+  "base_time": "2026-11-12T08:00:00Z",
+  "requires_rules": ["R001", "R002", "R003", "R004", "R005"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "SRV-WEB-01",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 08:00:01 srv-web-01 sshd[901]: Accepted publickey for alice from 192.168.133.20 port 49812 ssh2" },
+        { "offset_seconds": 45, "raw": "Nov 12 08:00:46 srv-web-01 sshd[915]: Failed password for bob from 192.168.133.21 port 50101 ssh2" },
+        { "offset_seconds": 120, "raw": "Nov 12 08:02:00 srv-web-01 sshd[923]: Accepted password for bob from 192.168.133.21 port 50155 ssh2" },
+        { "offset_seconds": 300, "raw": "Nov 12 08:05:00 srv-web-01 sshd[941]: Failed password for carol from 192.168.133.22 port 51200 ssh2" },
+        { "offset_seconds": 360, "raw": "Nov 12 08:06:00 srv-web-01 sshd[950]: Accepted publickey for carol from 192.168.133.22 port 51234 ssh2" },
+        { "offset_seconds": 600, "raw": "Nov 12 08:10:00 srv-web-01 sudo: alice : TTY=pts/0 ; PWD=/home/alice ; USER=root ; COMMAND=/usr/bin/systemctl status nginx" },
+        { "offset_seconds": 900, "raw": "Nov 12 08:15:00 srv-web-01 sshd[977]: Accepted password for dave from 192.168.133.23 port 52001 ssh2" }
+      ]
+    },
+    {
+      "source_type": "NGINX_ACCESS",
+      "hostname": "SRV-WEB-01",
+      "lines": [
+        { "offset_seconds": 5, "raw": "192.168.133.20 - - [12/Nov/2026:08:00:05 +0000] \"GET /index.html HTTP/1.1\" 200 4321 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64)\"" },
+        { "offset_seconds": 30, "raw": "192.168.133.21 - - [12/Nov/2026:08:00:30 +0000] \"GET /api/health HTTP/1.1\" 200 17 \"-\" \"curl/8.5.0\"" },
+        { "offset_seconds": 75, "raw": "192.168.133.22 - - [12/Nov/2026:08:01:15 +0000] \"GET /static/app.js HTTP/1.1\" 200 15234 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64)\"" },
+        { "offset_seconds": 180, "raw": "192.168.133.20 - - [12/Nov/2026:08:03:00 +0000] \"GET /favicon.ico HTTP/1.1\" 304 0 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64)\"" },
+        { "offset_seconds": 240, "raw": "192.168.133.23 - - [12/Nov/2026:08:04:00 +0000] \"GET /api/users HTTP/1.1\" 404 153 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64)\"" },
+        { "offset_seconds": 420, "raw": "192.168.133.21 - - [12/Nov/2026:08:07:00 +0000] \"POST /api/login HTTP/1.1\" 200 89 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64)\"" },
+        { "offset_seconds": 480, "raw": "192.168.133.22 - - [12/Nov/2026:08:08:00 +0000] \"GET /index.html HTTP/1.1\" 200 4321 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64)\"" }
+      ]
+    },
+    {
+      "source_type": "LINUX_SYSLOG",
+      "hostname": "SRV-WEB-01",
+      "lines": [
+        { "offset_seconds": 10, "raw": "Nov 12 08:00:10 srv-web-01 systemd[1]: Started Daily apt download activities." },
+        { "offset_seconds": 200, "raw": "Nov 12 08:03:20 srv-web-01 CRON[1102]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)" },
+        { "offset_seconds": 500, "raw": "Nov 12 08:08:20 srv-web-01 kernel: [UFW BLOCK] IN=eth0 OUT= MAC=00:11:22:33:44:55 SRC=198.51.100.7 DST=192.168.133.10 LEN=60" },
+        { "offset_seconds": 700, "raw": "Nov 12 08:11:40 srv-web-01 nginx: 192.168.133.20 - alice [12/Nov/2026:08:11:40 +0000] \"GET /status HTTP/1.1\" 200 2" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": true,
+    "expect_playbook_executions": [],
+    "expect_soar_actions": []
+  }
+}

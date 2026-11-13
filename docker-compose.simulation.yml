@@ -1,0 +1,15 @@
+# Simulation-only overrides for the attack-simulation harness.
+#
+# Runs SOAR playbooks against the in-memory dry-run firewall agent so scenarios
+# can prove detection → correlation → incident → SOAR orchestration without the
+# live pfSense / Windows Defender lab being up.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.simulation.yml up -d --build
+#   npm run simulate -- simulation/scenarios/r001-brute-force.json
+#
+# Do NOT use this override for the live lab — it never touches a real firewall.
+services:
+  app:
+    environment:
+      SOAR_FIREWALL_PROVIDER: dry_run

@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "api-key:generate": "npx tsx prisma/generate-api-key.ts",
-    "seed:rules": "npx tsx prisma/seed-correlation-rules.ts"
+    "seed:rules": "npx tsx prisma/seed-correlation-rules.ts",
+    "simulate": "tsx simulation/run.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^9.4.2",

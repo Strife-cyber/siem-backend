@@ -1,0 +1,42 @@
+{
+  "name": "r001-brute-force",
+  "description": "R001 gate scenario: 14 failed SSH password attempts from 192.168.243.10 (Kali) against the lab SSH server within 60 seconds, followed by one success. Must create an R001 incident and execute the block_ip SOAR playbook.",
+  "base_time": "2026-11-12T09:00:00Z",
+  "requires_rules": ["R001"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "KALI-01",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 09:00:00 kali sshd[1201]: Failed password for invalid user admin from 192.168.243.10 port 51234 ssh2" },
+        { "offset_seconds": 4, "raw": "Nov 12 09:00:04 kali sshd[1205]: Failed password for invalid user administrator from 192.168.243.10 port 51240 ssh2" },
+        { "offset_seconds": 8, "raw": "Nov 12 09:00:08 kali sshd[1209]: Failed password for invalid user root from 192.168.243.10 port 51241 ssh2" },
+        { "offset_seconds": 12, "raw": "Nov 12 09:00:12 kali sshd[1213]: Failed password for invalid user user from 192.168.243.10 port 51242 ssh2" },
+        { "offset_seconds": 16, "raw": "Nov 12 09:00:16 kali sshd[1217]: Failed password for invalid user test from 192.168.243.10 port 51243 ssh2" },
+        { "offset_seconds": 20, "raw": "Nov 12 09:00:20 kali sshd[1221]: Failed password for invalid user guest from 192.168.243.10 port 51244 ssh2" },
+        { "offset_seconds": 24, "raw": "Nov 12 09:00:24 kali sshd[1225]: Failed password for invalid user oracle from 192.168.243.10 port 51245 ssh2" },
+        { "offset_seconds": 28, "raw": "Nov 12 09:00:28 kali sshd[1229]: Failed password for invalid user postgres from 192.168.243.10 port 51246 ssh2" },
+        { "offset_seconds": 32, "raw": "Nov 12 09:00:32 kali sshd[1233]: Failed password for invalid user mysql from 192.168.243.10 port 51247 ssh2" },
+        { "offset_seconds": 36, "raw": "Nov 12 09:00:36 kali sshd[1237]: Failed password for invalid user service from 192.168.243.10 port 51248 ssh2" },
+        { "offset_seconds": 40, "raw": "Nov 12 09:00:40 kali sshd[1241]: Failed password for invalid user backup from 192.168.243.10 port 51249 ssh2" },
+        { "offset_seconds": 44, "raw": "Nov 12 09:00:44 kali sshd[1245]: Failed password for invalid user admin from 192.168.243.10 port 51250 ssh2" },
+        { "offset_seconds": 48, "raw": "Nov 12 09:00:48 kali sshd[1249]: Failed password for invalid user administrator from 192.168.243.10 port 51251 ssh2" },
+        { "offset_seconds": 52, "raw": "Nov 12 09:00:52 kali sshd[1253]: Failed password for invalid user root from 192.168.243.10 port 51252 ssh2" },
+        { "offset_seconds": 58, "raw": "Nov 12 09:00:58 kali sshd[1257]: Accepted password for admin from 192.168.243.10 port 51253 ssh2" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R001", "min_severity": "WARNING", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      { "playbook_name": "block_ip", "status": "EXECUTED", "min_count": 1 }
+    ],
+    "expect_soar_actions": [
+      { "action_type": "block_ip", "min_count": 1 }
+    ]
+  }
+}
