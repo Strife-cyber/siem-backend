@@ -11,6 +11,16 @@ The CTU (Counter-Terrorism Unit) Smart SIEM backend ingests security logs from m
 
 Built with **NestJS 11**, **Prisma 7** (PostgreSQL), **Elasticsearch**, and **BullMQ** (Redis).
 
+## Documentation
+
+Deployment, topology and multi-machine setup guides live in the
+[smart-siem_docs](https://github.com/Strife-cyber/smart-siem_docs) repo —
+architecture, single-VM vs multi-machine layouts, collector installation
+(Linux systemd / Windows audit policy), pfSense and Fortinet
+integration, hardening checklist, and troubleshooting. The companion
+[siem-collector](https://github.com/Strife-cyber/siem-collector) repo has
+its own README with build/test/replay instructions.
+
 ## Architecture
 
 ```
