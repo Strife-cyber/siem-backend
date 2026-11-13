@@ -122,3 +122,13 @@ them with real lab captures:
 
 This keeps the proof chain honest: real collector format in, real backend
 pipeline out.
+
+## Phase 2 deferred rules (telemetry gaps)
+
+- **R009 Impossible Travel** — needs a GeoIP database; the collector emits no geo fields and no GeoIP service is configured. Deferred until geo enrichment exists.
+- **R012 Linux Shell Abuse** — `LinuxProcess` events fall through to `default_normalized` with action `UNKNOWN` (no command-line telemetry), so command-line abuse patterns cannot be detected. Needs collector process-command telemetry first.
+- **R016 SSH Persistence (authorized_keys)** — no Linux file-access telemetry in the collector (FILE_ACCESS is Windows-only).
+- **R019 Firewall Modification** — collector has no firewall *configuration-change* events (only allow/deny traffic events).
+- **R024 DNS Tunneling** — no DNS telemetry collected.
+- **R025 Unusual Data Staging** — needs file-operation/content visibility the collector does not provide.
+- **C004 / C005 / C009** — these sequences require a proven data-exfiltration Layer-1 signal; R003 needs user-attributed outbound byte telemetry (`bytes_sent`) the collector does not emit, so the chains cannot be simulation-proven yet.

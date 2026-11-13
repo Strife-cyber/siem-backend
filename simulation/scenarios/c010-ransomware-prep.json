@@ -1,0 +1,52 @@
+{
+  "name": "c010-ransomware-prep",
+  "description": "C010: Defender stopped then Security.evtx deleted on same host. Expects C010 CRITICAL + isolate CONFIRM.",
+  "base_time": "2026-11-12T14:10:00Z",
+  "requires_rules": [
+    "R018",
+    "R020",
+    "C010"
+  ],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "WIN-SRV-05",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Service Control Manager\"/><EventID>7036</EventID></System><EventData><Data Name=\"param1\">stopped</Data><Data Name=\"param2\">WinDefend</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 120,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4663</EventID></System><EventData><Data Name=\"SubjectUserName\">admin</Data><Data Name=\"AccessMask\">0x10000</Data><Data Name=\"ObjectName\">C:\\Windows\\System32\\winevt\\Logs\\Security.evtx</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R018",
+        "min_severity": "HIGH",
+        "min_count": 1
+      },
+      {
+        "rule_id": "R020",
+        "min_severity": "HIGH",
+        "min_count": 1
+      },
+      {
+        "rule_id": "C010",
+        "min_severity": "CRITICAL",
+        "min_count": 1
+      }
+    ],
+    "expect_playbook_executions": [
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      }
+    ]
+  }
+}

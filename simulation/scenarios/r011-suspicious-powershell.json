@@ -1,0 +1,23 @@
+{
+  "name": "r011-suspicious-powershell",
+  "description": "R011: Windows 4688 process creation of powershell with -enc (base64) download-execute cradle. Expects R011 HIGH incident (alert-only; kill_process playbook not yet implemented).",
+  "base_time": "2026-11-12T12:50:00Z",
+  "requires_rules": ["R011"],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "WIN-WS-01",
+      "lines": [
+        { "offset_seconds": 0, "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4688</EventID></System><EventData><Data Name=\"SubjectUserName\">jdoe</Data><Data Name=\"NewProcessName\">C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</Data><Data Name=\"CommandLine\">powershell.exe -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoA</Data><Data Name=\"TargetUserName\">jdoe</Data></EventData></Event>" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R011", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_entity_risk": [
+      { "entity_type": "USER", "value": "jdoe", "min_score": 25 }
+    ]
+  }
+}

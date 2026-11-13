@@ -1,0 +1,41 @@
+{
+  "name": "r023-rdp-lateral",
+  "description": "R023: one host opens RDP to 4 internal hosts. Expects R023 WARNING.",
+  "base_time": "2026-11-12T13:50:00Z",
+  "requires_rules": [
+    "R023"
+  ],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "PFSENSE-04",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "ALLOW 10.60.0.5 10.60.0.31 53000 3389 TCP"
+        },
+        {
+          "offset_seconds": 3,
+          "raw": "ALLOW 10.60.0.5 10.60.0.32 53000 3389 TCP"
+        },
+        {
+          "offset_seconds": 6,
+          "raw": "ALLOW 10.60.0.5 10.60.0.33 53000 3389 TCP"
+        },
+        {
+          "offset_seconds": 9,
+          "raw": "ALLOW 10.60.0.5 10.60.0.34 53000 3389 TCP"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R023",
+        "min_severity": "WARNING",
+        "min_count": 1
+      }
+    ]
+  }
+}

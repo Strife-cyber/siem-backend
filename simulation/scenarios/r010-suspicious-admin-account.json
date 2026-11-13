@@ -1,0 +1,24 @@
+{
+  "name": "r010-suspicious-admin-account",
+  "description": "R010: creation of a new account added to the sudo group. Expects R010 WARNING incident (alert-only).",
+  "base_time": "2026-11-12T12:45:00Z",
+  "requires_rules": ["R010"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "SRV-DC-03",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 12:45:00 srv-dc-03 useradd[8301]: new user: name=svc_monitor, UID=1501, GID=27(sudo), groups=sudo" },
+        { "offset_seconds": 2, "raw": "Nov 12 12:45:02 srv-dc-03 usermod[8302]: add 'svc_monitor' to group 'sudo'" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R010", "min_severity": "WARNING", "min_count": 1 }
+    ],
+    "expect_entity_risk": [
+      { "entity_type": "HOST", "value": "srv-dc-03", "min_score": 20 }
+    ]
+  }
+}

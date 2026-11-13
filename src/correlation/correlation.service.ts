@@ -10,6 +10,25 @@ import { DataExfilRule } from './rules/r003-data-exfiltration.rule';
 import { LogClearingRule } from './rules/r004-log-clearing.rule';
 import { ReconnaissanceRule } from './rules/r005-reconnaissance.rule';
 import { SuccessfulLoginAfterFailuresRule } from './rules/r008-successful-login-after-failures.rule';
+import {
+  SshPasswordGuessingRule,
+  PasswordSprayingRule,
+} from './rules/r006-ssh-password-guessing.rule';
+import {
+  StartupPersistenceRule,
+  DefenseEvasionRule,
+  FileDeletionRule,
+  InternalDiscoveryRule,
+  SmbLateralMovementRule,
+  RdpLateralMovementRule,
+} from './rules/r017-r023-integrity-network.rules';
+import {
+  SuspiciousAdminAccountRule,
+  SuspiciousPowerShellRule,
+  PrivilegeEscalationRule,
+  SudoAbuseRule,
+  ScheduledTaskRule,
+} from './rules/r010-r015-host-monitoring.rules';
 import { ATTACK_CORRELATION_RULES } from './rules/attack-correlation.rules';
 import type {
   DetectionRule,
@@ -50,6 +69,19 @@ export class CorrelationService {
     new LogClearingRule(),
     new ReconnaissanceRule(),
     new SuccessfulLoginAfterFailuresRule(),
+    new SshPasswordGuessingRule(),
+    new PasswordSprayingRule(),
+    new SuspiciousAdminAccountRule(),
+    new SuspiciousPowerShellRule(),
+    new PrivilegeEscalationRule(),
+    new SudoAbuseRule(),
+    new ScheduledTaskRule(),
+    new StartupPersistenceRule(),
+    new DefenseEvasionRule(),
+    new FileDeletionRule(),
+    new InternalDiscoveryRule(),
+    new SmbLateralMovementRule(),
+    new RdpLateralMovementRule(),
   ];
 
   /** Layer-2 attack correlation rules (C001–C003) — run after event rules */

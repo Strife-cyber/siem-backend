@@ -1,0 +1,72 @@
+{
+  "name": "c006-admin-account-chain",
+  "description": "C006: privileged account creation then successful login after failures for that account. Expects C006 HIGH + disable_account CONFIRM.",
+  "base_time": "2026-11-12T13:55:00Z",
+  "requires_rules": [
+    "R010",
+    "R008",
+    "C006"
+  ],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "SRV-DC-05",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 12 13:55:00 srv-dc-05 useradd[8401]: new user: name=svc_audit, UID=1502, GID=27(sudo), groups=sudo"
+        },
+        {
+          "offset_seconds": 30,
+          "raw": "Nov 12 13:55:30 srv-dc-05 sshd[8410]: Failed password for svc_audit from 10.40.0.5 port 54001 ssh2"
+        },
+        {
+          "offset_seconds": 35,
+          "raw": "Nov 12 13:55:35 srv-dc-05 sshd[8411]: Failed password for svc_audit from 10.40.0.5 port 54002 ssh2"
+        },
+        {
+          "offset_seconds": 40,
+          "raw": "Nov 12 13:55:40 srv-dc-05 sshd[8412]: Failed password for svc_audit from 10.40.0.5 port 54003 ssh2"
+        },
+        {
+          "offset_seconds": 45,
+          "raw": "Nov 12 13:55:45 srv-dc-05 sshd[8413]: Failed password for svc_audit from 10.40.0.5 port 54004 ssh2"
+        },
+        {
+          "offset_seconds": 50,
+          "raw": "Nov 12 13:55:50 srv-dc-05 sshd[8414]: Failed password for svc_audit from 10.40.0.5 port 54005 ssh2"
+        },
+        {
+          "offset_seconds": 55,
+          "raw": "Nov 12 13:55:55 srv-dc-05 sshd[8415]: Accepted password for svc_audit from 10.40.0.5 port 54006 ssh2"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R010",
+        "min_severity": "WARNING",
+        "min_count": 1
+      },
+      {
+        "rule_id": "R008",
+        "min_severity": "HIGH",
+        "min_count": 1
+      },
+      {
+        "rule_id": "C006",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_playbook_executions": [
+      {
+        "playbook_name": "disable_account",
+        "status": "PENDING",
+        "min_count": 1
+      }
+    ]
+  }
+}
