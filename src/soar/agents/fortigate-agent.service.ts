@@ -477,26 +477,30 @@ export class FortiGateAgentService implements IFirewallAgent {
   }
 
   /**
-   * FortiGate evaluates policies top-down and first match wins, so a deny
-   * policy appended at the bottom is shadowed by any earlier allow policy.
-   * Smart SIEM containment policies are therefore moved to the top of the
-   * list after every create/update (self-healing if reordered manually).
+   * FortiGate evaluates policies top-down (config sequence) and first match
+   * wins, so a deny policy appended at the bottom is shadowed by any earlier
+   * allow policy. policyid is a stable identifier, NOT the sequence
+   * position, so the sequence is taken from the order the REST table read
+   * returns entries (CLI table order = evaluation order); unnamed policies
+   * still occupy positions and must be counted. The policy is moved before
+   * the first entry that is not ours after every create/update.
    */
   private async movePolicyToTop(policyName: string): Promise<void> {
     const policies = await this.getAllPolicies();
     const entries = policies
       .map((p: any) => ({
-        name: String(p?.name ?? ''),
-        id: Number(p?.policyid),
+        name: p?.name == null ? '' : String(p.name),
+        id: String(p?.policyid ?? ''),
       }))
-      .filter((p) => p.name !== '' && Number.isFinite(p.id))
-      .sort((a, b) => a.id - b.id);
-    const ours = entries.find((p) => p.name === policyName);
+      .filter((p) => p.id !== '');
+    const oursIndex = entries.findIndex((p) => p.name === policyName);
+    if (oursIndex === -1 || oursIndex === 0) return; // missing or already first
     const first = entries.find((p) => p.name !== policyName);
-    if (!ours || !first || ours.id <= first.id) return;
+    const ours = entries[oursIndex];
+    if (!first) return;
     const res = await this.request(
       'PUT',
-      `/api/v2/cmdb/firewall/policy/${encodeURIComponent(String(ours.id))}?action=move&before=${encodeURIComponent(String(first.id))}`,
+      `/api/v2/cmdb/firewall/policy/${encodeURIComponent(ours.id)}?action=move&before=${encodeURIComponent(first.id)}`,
     );
     if (res.status !== 'success') {
       this.logger.warn(
