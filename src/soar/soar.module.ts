@@ -2,6 +2,7 @@ import { Module, Logger } from '@nestjs/common';
 import { SoarController } from './soar.controller';
 import { SoarService } from './soar.service';
 import { PfSenseAgentService } from './agents/pfsense-agent.service';
+import { FortiGateAgentService } from './agents/fortigate-agent.service';
 import { WindowsDefenderAgentClientService } from './agents/windows-defender-agent.service';
 import { DryRunAgentService } from './agents/dry-run-agent.service';
 import {
@@ -14,6 +15,7 @@ const firewallAgentProvider = {
   useFactory: (
     wd: WindowsDefenderAgentClientService,
     pf: PfSenseAgentService,
+    fg: FortiGateAgentService,
     dryRun: DryRunAgentService,
   ): IFirewallAgent => {
     const provider = (
@@ -26,6 +28,9 @@ const firewallAgentProvider = {
       case 'pfsense':
         agent = pf;
         break;
+      case 'fortigate':
+        agent = fg;
+        break;
       case 'windows_defender':
         agent = wd;
         break;
@@ -35,7 +40,7 @@ const firewallAgentProvider = {
       default:
         throw new Error(
           `Unknown SOAR_FIREWALL_PROVIDER: "${provider}". ` +
-            `Valid values: "pfsense", "windows_defender", "dry_run".`,
+            `Valid values: "pfsense", "fortigate", "windows_defender", "dry_run".`,
         );
     }
 
@@ -57,6 +62,7 @@ const firewallAgentProvider = {
   inject: [
     WindowsDefenderAgentClientService,
     PfSenseAgentService,
+    FortiGateAgentService,
     DryRunAgentService,
   ],
 };
@@ -66,6 +72,7 @@ const firewallAgentProvider = {
   providers: [
     SoarService,
     PfSenseAgentService,
+    FortiGateAgentService,
     WindowsDefenderAgentClientService,
     DryRunAgentService,
     firewallAgentProvider,
