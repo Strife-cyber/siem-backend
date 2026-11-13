@@ -3,6 +3,7 @@ import { BullModule, InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { CorrelationService } from './correlation.service';
 import { CorrelationScheduler } from './correlation.scheduler';
+import { MitreController } from './mitre.controller';
 import { SoarModule } from '../soar/soar.module';
 import { EntitiesModule } from '../entities/entities.module';
 
@@ -26,6 +27,7 @@ import { EntitiesModule } from '../entities/entities.module';
     SoarModule,
     EntitiesModule,
   ],
+  controllers: [MitreController],
   providers: [CorrelationService, CorrelationScheduler],
 })
 export class CorrelationModule implements OnModuleInit {

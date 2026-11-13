@@ -52,10 +52,11 @@ const SEVERITY_FALLBACK: Record<string, number> = {
 };
 
 export function riskBand(score: number): string {
-  for (const band of RISK_BANDS) {
-    if (score >= band.min && score <= band.max) return band.label;
-  }
-  return 'CRITICAL';
+  if (score >= 80) return 'CRITICAL';
+  if (score >= 60) return 'HIGH';
+  if (score >= 40) return 'MEDIUM';
+  if (score >= 20) return 'LOW';
+  return 'INFORMATIONAL';
 }
 
 interface RiskConfig {
