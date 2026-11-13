@@ -351,6 +351,132 @@ function sequenceCorrelation(cfg: SequenceStageConfig): AttackCorrelationRule {
 }
 
 /**
+ * IP→HOST bridge through the entity graph: incidents like R003 (flow
+ * bytes) carry only IPs while staging/persistence incidents carry only
+ * hosts. The entity graph links an IP to the hosts it contacted, so a
+ * terminal exfil incident can be matched back to the compromised host.
+ */
+async function bridgeIpsToHosts(
+  prisma: PrismaService,
+  incidents: IncidentRow[],
+): Promise<Map<string, string[]>> {
+  const ips = [...new Set(incidents.flatMap((i) => ipsOf(i)))];
+  if (ips.length === 0) return new Map();
+  const edges = await prisma.entityEdge.findMany({
+    where: {
+      source: { entity_type: 'IP', value: { in: ips } },
+      target: { entity_type: 'HOST' },
+    },
+    select: {
+      source: { select: { value: true } },
+      target: { select: { value: true } },
+    },
+  });
+  const ipToHosts = new Map<string, Set<string>>();
+  for (const e of edges) {
+    const set = ipToHosts.get(e.source.value) ?? new Set<string>();
+    set.add(e.target.value);
+    ipToHosts.set(e.source.value, set);
+  }
+  const out = new Map<string, string[]>();
+  for (const i of incidents) {
+    const hosts = new Set<string>();
+    for (const ip of ipsOf(i)) {
+      for (const h of ipToHosts.get(ip) ?? []) hosts.add(h);
+    }
+    if (hosts.size > 0) out.set(i.id, [...hosts]);
+  }
+  return out;
+}
+
+function bridgedShareEntity(
+  a: IncidentRow,
+  b: IncidentRow,
+  bridge: Map<string, string[]>,
+): boolean {
+  const effectiveHosts = (i: IncidentRow) =>
+    union(hostsOf(i), bridge.get(i.id) ?? []);
+  const pairs: Array<[string[], string[]]> = [
+    [ipsOf(a), ipsOf(b)],
+    [effectiveHosts(a), effectiveHosts(b)],
+    [usersOf(a), usersOf(b)],
+  ];
+  return pairs.some(([x, y]) => x.length > 0 && y.length > 0 && overlap(x, y));
+}
+
+/** sequenceCorrelation variant that bridges IP-only incidents to hosts via the entity graph. */
+function bridgedSequenceCorrelation(
+  cfg: SequenceStageConfig,
+): AttackCorrelationRule {
+  return {
+    id: cfg.id,
+    name: cfg.name,
+    async detect(prisma: PrismaService, since: Date) {
+      const stageRules = cfg.stages.flat();
+      const incidents = await loadIncidents(prisma, since, stageRules);
+      const bridge = await bridgeIpsToHosts(prisma, incidents);
+      const sorted = [...incidents].sort(
+        (a, b) => a.triggered_at.getTime() - b.triggered_at.getTime(),
+      );
+      const results: AttackCorrelationResult[] = [];
+      const fired = new Set<string>();
+
+      for (const start of sorted) {
+        if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
+        const chain: IncidentRow[] = [start];
+        let cursor = start;
+        let matched = true;
+
+        for (let s = 1; s < cfg.stages.length; s++) {
+          const next = sorted.find(
+            (i) =>
+              cfg.stages[s].includes(i.rule_id ?? '') &&
+              Math.abs(
+                i.triggered_at.getTime() - cursor.triggered_at.getTime(),
+              ) <= WINDOW_MS &&
+              chain.every((c) => bridgedShareEntity(c, i, bridge)),
+          );
+          if (!next) {
+            matched = false;
+            break;
+          }
+          chain.push(next);
+          cursor = next;
+        }
+        if (!matched) continue;
+
+        const key = chain.map((c) => c.id).join('|');
+        if (fired.has(key)) continue;
+        fired.add(key);
+
+        const chainIps = [...new Set(chain.flatMap((c) => ipsOf(c)))];
+        const chainUsers = [...new Set(chain.flatMap((c) => usersOf(c)))];
+        const chainHosts = [
+          ...new Set(
+            chain.flatMap((c) => union(hostsOf(c), bridge.get(c.id) ?? [])),
+          ),
+        ];
+        results.push({
+          rule_id: this.id,
+          rule_name: this.name,
+          severity: cfg.severity,
+          confidence_score: cfg.confidence,
+          summary: cfg.summary(chain),
+          related_entities: {
+            ips: chainIps,
+            users: chainUsers,
+            hosts: chainHosts,
+          },
+          prerequisite_incident_ids: chain.map((c) => c.id),
+          response: cfg.response,
+        });
+      }
+      return results;
+    },
+  };
+}
+
+/**
  * C006 — Suspicious administrative account creation (spec §4, MITRE T1136+T1098+T1078)
  * R010 (admin account created) followed by R008 (successful login after
  * failures) for the same account/IP within 30 minutes → disable_account CONFIRM.
@@ -428,7 +554,7 @@ const RansomwarePreparationRule = sequenceCorrelation({
  * The spec's directory-enumeration step has no dedicated rule yet; access +
  * staging + transfer is the provable chain.
  */
-const StagingToExfiltrationRule = sequenceCorrelation({
+const StagingToExfiltrationRule = bridgedSequenceCorrelation({
   id: 'C004',
   name: 'Data Staging and Exfiltration Chain',
   stages: [['R008'], ['R025'], ['R003']],
@@ -446,7 +572,7 @@ const StagingToExfiltrationRule = sequenceCorrelation({
  * R018 (security tools disabled) → R019 (firewall modified) or R004 (logs
  * cleared) → R003 (outbound flow volume) → CRITICAL, isolate CONFIRM.
  */
-const DefenseEvasionToExfilRule = sequenceCorrelation({
+const DefenseEvasionToExfilRule = bridgedSequenceCorrelation({
   id: 'C005',
   name: 'Defense Evasion to Exfiltration Chain',
   stages: [['R018'], ['R019', 'R004'], ['R003']],
@@ -465,7 +591,7 @@ const DefenseEvasionToExfilRule = sequenceCorrelation({
  * flow volume). Database-connection and query-anomaly steps have no
  * telemetry yet; this correlates the provable recon → transfer chain.
  */
-const ReconToDataTransferRule = sequenceCorrelation({
+const ReconToDataTransferRule = bridgedSequenceCorrelation({
   id: 'C009',
   name: 'Internal Recon to Data Transfer Chain',
   stages: [['R021'], ['R005'], ['R003']],
