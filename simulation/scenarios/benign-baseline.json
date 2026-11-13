@@ -30,7 +30,8 @@
     "R020",
     "R021",
     "R022",
-    "R023"
+    "R023",
+    "R024"
   ],
   "sources": [
     {
@@ -140,6 +141,24 @@
         {
           "offset_seconds": 40,
           "raw": "type=PATH msg=audit(1763036440.100:4001): item=0 name=\"/home/deploy/app.log\" nametype=CREATE mode=0100644 ouid=1002 ogid=1002 rdev=00:00"
+        }
+      ]
+    },
+    {
+      "source_type": "LINUX_SYSLOG",
+      "hostname": "srv-dns-02",
+      "lines": [
+        {
+          "offset_seconds": 50,
+          "raw": "Nov 13 08:00:01 srv-dns-02 dnsmasq[4321]: query[A] www.google.com from 10.0.0.20"
+        },
+        {
+          "offset_seconds": 55,
+          "raw": "Nov 13 08:00:06 srv-dns-02 dnsmasq[4321]: query[A] archive.ubuntu.com from 10.0.0.21"
+        },
+        {
+          "offset_seconds": 60,
+          "raw": "Nov 13 08:00:11 srv-dns-02 dnsmasq[4321]: reply www.google.com is 142.250.74.46"
         }
       ]
     }

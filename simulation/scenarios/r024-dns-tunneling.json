@@ -1,0 +1,176 @@
+{
+  "name": "r024-dns-tunneling",
+  "description": "R024: 32 high-volume, long/high-entropy DNS queries to *.exfil.evil-corp.com (T1071.004) plus benign lookups. A long query alone is not enough \u2014 volume+entropy/length required. Expects R024 HIGH incident (alert-only; no block_domain playbook exists).",
+  "base_time": "2026-11-13T11:00:00Z",
+  "requires_rules": [
+    "R024"
+  ],
+  "sources": [
+    {
+      "source_type": "LINUX_SYSLOG",
+      "hostname": "srv-dns-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 13 11:00:00 srv-dns-01 dnsmasq[1234]: query[A] ahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkr.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "Nov 13 11:00:01 srv-dns-01 dnsmasq[1234]: query[A] lszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovc.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 20,
+          "raw": "Nov 13 11:00:02 srv-dns-01 dnsmasq[1234]: query[A] wdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgn.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 30,
+          "raw": "Nov 13 11:00:03 srv-dns-01 dnsmasq[1234]: query[A] hovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkry.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 40,
+          "raw": "Nov 13 11:00:04 srv-dns-01 dnsmasq[1234]: query[A] szgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcj.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 50,
+          "raw": "Nov 13 11:00:05 srv-dns-01 dnsmasq[1234]: query[A] dkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnu.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 60,
+          "raw": "Nov 13 11:00:06 srv-dns-01 dnsmasq[1234]: query[A] ovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryf.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 70,
+          "raw": "Nov 13 11:00:07 srv-dns-01 dnsmasq[1234]: query[A] zgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjq.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 80,
+          "raw": "Nov 13 11:00:08 srv-dns-01 dnsmasq[1234]: query[A] kryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnub.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 90,
+          "raw": "Nov 13 11:00:09 srv-dns-01 dnsmasq[1234]: query[A] vcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfm.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 100,
+          "raw": "Nov 13 11:00:10 srv-dns-01 dnsmasq[1234]: query[A] gnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqx.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 110,
+          "raw": "Nov 13 11:00:11 srv-dns-01 dnsmasq[1234]: query[A] ryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubi.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 120,
+          "raw": "Nov 13 11:00:12 srv-dns-01 dnsmasq[1234]: query[A] cjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmt.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 130,
+          "raw": "Nov 13 11:00:13 srv-dns-01 dnsmasq[1234]: query[A] nubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxe.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 140,
+          "raw": "Nov 13 11:00:14 srv-dns-01 dnsmasq[1234]: query[A] yfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubip.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 150,
+          "raw": "Nov 13 11:00:15 srv-dns-01 dnsmasq[1234]: query[A] jqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmta.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 160,
+          "raw": "Nov 13 11:00:16 srv-dns-01 dnsmasq[1234]: query[A] ubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxel.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 170,
+          "raw": "Nov 13 11:00:17 srv-dns-01 dnsmasq[1234]: query[A] fmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipw.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 180,
+          "raw": "Nov 13 11:00:18 srv-dns-01 dnsmasq[1234]: query[A] qxelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtah.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 190,
+          "raw": "Nov 13 11:00:19 srv-dns-01 dnsmasq[1234]: query[A] bipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxels.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 200,
+          "raw": "Nov 13 11:00:20 srv-dns-01 dnsmasq[1234]: query[A] mtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwd.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 210,
+          "raw": "Nov 13 11:00:21 srv-dns-01 dnsmasq[1234]: query[A] xelszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtaho.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 220,
+          "raw": "Nov 13 11:00:22 srv-dns-01 dnsmasq[1234]: query[A] ipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelsz.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 230,
+          "raw": "Nov 13 11:00:23 srv-dns-01 dnsmasq[1234]: query[A] tahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdk.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 240,
+          "raw": "Nov 13 11:00:24 srv-dns-01 dnsmasq[1234]: query[A] elszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahov.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 250,
+          "raw": "Nov 13 11:00:25 srv-dns-01 dnsmasq[1234]: query[A] pwdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszg.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 260,
+          "raw": "Nov 13 11:00:26 srv-dns-01 dnsmasq[1234]: query[A] ahovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkr.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 270,
+          "raw": "Nov 13 11:00:27 srv-dns-01 dnsmasq[1234]: query[A] lszgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovc.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 280,
+          "raw": "Nov 13 11:00:28 srv-dns-01 dnsmasq[1234]: query[A] wdkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgn.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 290,
+          "raw": "Nov 13 11:00:29 srv-dns-01 dnsmasq[1234]: query[A] hovcjqxelszgnubipwdkryfmtahovcjqxelszgnubipwdkry.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 300,
+          "raw": "Nov 13 11:00:30 srv-dns-01 dnsmasq[1234]: query[A] szgnubipwdkryfmtahovcjqxelszgnubipwdkryfmtahovcj.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 310,
+          "raw": "Nov 13 11:00:31 srv-dns-01 dnsmasq[1234]: query[A] dkryfmtahovcjqxelszgnubipwdkryfmtahovcjqxelszgnu.exfil.evil-corp.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 330,
+          "raw": "Nov 13 11:05:10 srv-dns-01 dnsmasq[1234]: query[A] www.google.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 340,
+          "raw": "Nov 13 11:05:15 srv-dns-01 dnsmasq[1234]: query[A] www.cloudflare.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 350,
+          "raw": "Nov 13 11:05:20 srv-dns-01 dnsmasq[1234]: query[A] update.microsoft.com from 10.0.0.5"
+        },
+        {
+          "offset_seconds": 360,
+          "raw": "Nov 13 11:05:25 srv-dns-01 dnsmasq[1234]: query[A] archive.ubuntu.com from 10.0.0.5"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R024",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_entity_risk": [
+      {
+        "entity_type": "HOST",
+        "value": "srv-dns-01",
+        "min_score": 20
+      }
+    ]
+  }
+}

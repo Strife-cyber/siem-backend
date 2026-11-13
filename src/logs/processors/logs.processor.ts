@@ -73,6 +73,7 @@ export class LogsProcessor extends WorkerHost {
         outcome: log.outcome?.toLowerCase(),
         process_name: log.process_name?.toLowerCase(),
         command_line: log.command_line?.toLowerCase(),
+        domain: log.domain?.toLowerCase(),
         file_path: log.file_path?.toLowerCase(),
         file_operation: log.file_operation?.toLowerCase(),
         severity: log.severity,

@@ -37,6 +37,8 @@ export interface NormalizedLog {
   process_name?: string;
   /** Full command line of the process (when the source provides it) */
   command_line?: string;
+  /** DNS domain queried/resolved (dnsmasq/unbound resolver logs) */
+  domain?: string;
   /** File path targeted by a file-access event */
   file_path?: string;
   /** Coarse file operation: 'read' | 'write' | 'delete' | 'access' */

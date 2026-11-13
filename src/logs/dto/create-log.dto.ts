@@ -66,6 +66,10 @@ export class CreateLogDto {
 
   @IsOptional()
   @IsString()
+  domain?: string;
+
+  @IsOptional()
+  @IsString()
   file_path?: string;
 
   @IsOptional()
