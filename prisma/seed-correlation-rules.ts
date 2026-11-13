@@ -430,6 +430,21 @@ const RULES = [
     is_active: false,
   },
   {
+    id: 'R019',
+    name: 'Firewall Modification',
+    tactic: 'TA0005',
+    technique: 'T1562.004',
+    definition: {
+      time_window_seconds: 900,
+      interval_seconds: 300,
+      threshold: 1,
+      source_types: ['windows_network'],
+      actions: ['firewall_rule_change'],
+    },
+    confidence_weight: 70,
+    is_active: false,
+  },
+  {
     id: 'R025',
     name: 'Unusual Data Staging',
     tactic: 'TA0009',

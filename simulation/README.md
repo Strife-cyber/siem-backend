@@ -126,12 +126,12 @@ pipeline out.
 ## Deferred rules & correlations (telemetry gaps)
 
 - **R009 Impossible Travel** — needs a GeoIP database; the collector emits no geo fields and no GeoIP service is configured. Deferred until geo enrichment exists.
-- **R019 Firewall Modification** — the collector has no firewall *configuration-change* parser yet (pfSense config changes are not in filterlog; Windows 2004–2009 rule-change events are collected but not classified). Deferred until a config-change signal is normalized.
 - **C004 / C005 / C009** — deferred: all three chains end in a data-exfiltration signal, and R003 needs per-user/per-flow outbound byte telemetry (`bytes_sent`) that no current collector source provides. pfSense filterlog carries only per-packet payload lengths (no cumulative bytes, no user attribution); honest per-flow bytes would need conntrack collection (new collector work). The chains cannot be simulation-proven until then.
 
 ## Implemented deferred rules (telemetry now available)
 
 - **R012 Linux Shell Abuse** — auditd EXECVE telemetry (siem-collector): reverse shells, download-and-execute cradles, encoded payloads in `command_line`.
 - **R016 SSH Persistence (authorized_keys)** — auditd PATH records: any `authorized_keys` file access.
+- **R019 Firewall Modification** — Windows Firewall with Advanced Security rule-change events (2004–2009), classified as `firewall_rule_change` by the collector (siem-collector#7). pfSense config changes remain a separate signal.
 - **R024 DNS Tunneling** — dnsmasq/unbound resolver telemetry: high volume + long/high-entropy domain names, aggregated per registered domain.
 - **R025 Unusual Data Staging** — auditd PATH / Windows 4663 file operations: bursts of archive-file creation on one host. Content-level staging (reading sensitive files) still needs FIM/content telemetry; this detects the archive-aggregation signal.

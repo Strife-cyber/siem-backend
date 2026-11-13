@@ -1,0 +1,44 @@
+{
+  "name": "r019-firewall-modification",
+  "description": "R019: Windows Firewall rule changes (T1562.004) — unauthorized firewall rules changed or disabled (alert CONFIRM)",
+  "repeat": 1,
+  "sources": [
+    {
+      "source_type": "WINDOWS_NETWORK",
+      "hostname": "WIN-DC-09",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>2004</EventID></System><EventData><Data Name=\"SubjectUserName\">SYSTEM</Data><Data Name=\"RuleName\">Allow inbound TCP 4444</Data><Data Name=\"Direction\">Inbound</Data><Data Name=\"Action\">Allow</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>2005</EventID></System><EventData><Data Name=\"SubjectUserName\">SYSTEM</Data><Data Name=\"RuleName\">Allow inbound TCP 4444</Data><Data Name=\"Direction\">Inbound</Data><Data Name=\"Action\">Allow</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 20,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>2006</EventID></System><EventData><Data Name=\"SubjectUserName\">admin</Data><Data Name=\"RuleName\">Block outbound TCP 4444</Data><Data Name=\"Direction\">Outbound</Data><Data Name=\"Action\">Block</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 30,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>2009</EventID></System><EventData><Data Name=\"SubjectUserName\">SYSTEM</Data><Data Name=\"RuleName\">Allow inbound UDP 53</Data><Data Name=\"Direction\">Inbound</Data><Data Name=\"Action\">Allow</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    {
+      "type": "min_incidents",
+      "rule_id": "R019",
+      "min_severity": "WARNING",
+      "min_count": 1
+    },
+    {
+      "type": "entity_risk",
+      "entity_type": "HOST",
+      "entity_value": "win-dc-09",
+      "min_score": 10
+    }
+  ],
+  "base_time": "2026-11-13T13:00:00Z"
+}
