@@ -77,7 +77,7 @@ export class PassTheHashRule implements DetectionRule {
               { term: { outcome: 'success' } },
               {
                 range: {
-                  collected_at: {
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },
@@ -128,10 +128,12 @@ export class PassTheHashRule implements DetectionRule {
           bool: {
             filter: [
               { terms: { source_type: ['windows_security'] } },
-              { term: { outcome: 'success' } },
+              // Collector does not set `outcome` on Windows logon events;
+              // the action already encodes success/failure.
+              { term: { action: 'successful_login' } },
               {
                 range: {
-                  collected_at: {
+                  normalized_at: {
                     gte: since.toISOString(),
                     lte: now.toISOString(),
                   },

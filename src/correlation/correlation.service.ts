@@ -15,6 +15,14 @@ import {
   PasswordSprayingRule,
 } from './rules/r006-ssh-password-guessing.rule';
 import {
+  StartupPersistenceRule,
+  DefenseEvasionRule,
+  FileDeletionRule,
+  InternalDiscoveryRule,
+  SmbLateralMovementRule,
+  RdpLateralMovementRule,
+} from './rules/r017-r023-integrity-network.rules';
+import {
   SuspiciousAdminAccountRule,
   SuspiciousPowerShellRule,
   PrivilegeEscalationRule,
@@ -68,6 +76,12 @@ export class CorrelationService {
     new PrivilegeEscalationRule(),
     new SudoAbuseRule(),
     new ScheduledTaskRule(),
+    new StartupPersistenceRule(),
+    new DefenseEvasionRule(),
+    new FileDeletionRule(),
+    new InternalDiscoveryRule(),
+    new SmbLateralMovementRule(),
+    new RdpLateralMovementRule(),
   ];
 
   /** Layer-2 attack correlation rules (C001–C003) — run after event rules */
