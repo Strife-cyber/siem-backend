@@ -40,7 +40,7 @@
         },
         {
           "offset_seconds": 6,
-          "raw": "Nov 12 10:01:06 srv-dc-01 sshd[4116]: Failed password for admin from 10.1.0.5 port 52006 ssh2"
+          "raw": "Nov 12 10:01:06 srv-dc-01 sshd[4116]: Accepted password for admin from 10.1.0.5 port 52006 ssh2"
         }
       ]
     },
