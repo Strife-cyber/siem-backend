@@ -213,6 +213,12 @@ const RULES = [
       actions: ['network_connect', 'network_flow', 'http_request', 'firewall_allow', 'firewall_deny', 'firewall_event', 'connection_state'] },
     confidence_weight: 80, is_active: false,
   },
+  {
+    id: 'R012', name: 'Linux Shell Abuse', tactic: 'TA0002', technique: 'T1059.004',
+    definition: { time_window_seconds: 900, interval_seconds: 300, threshold: 1,
+      source_types: ['linux_auditd'], actions: ['process_exec'] },
+    confidence_weight: 85, is_active: false,
+  },
   // ── Layer-2 attack correlation rules (C001–C003) ──
   {
     id: 'C001',

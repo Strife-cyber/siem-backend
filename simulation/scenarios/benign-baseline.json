@@ -3,6 +3,13 @@
   "description": "Gate scenario: a day of normal office activity (successful SSH logins, a couple of isolated failed logins below the R001 threshold, routine nginx web traffic, syslog noise). Must produce zero HIGH/CRITICAL incidents and no SOAR actions.",
   "base_time": "2026-11-12T08:00:00Z",
   "requires_rules": [
+    "C001",
+    "C002",
+    "C003",
+    "C006",
+    "C007",
+    "C008",
+    "C010",
     "R001",
     "R002",
     "R003",
@@ -13,6 +20,7 @@
     "R008",
     "R010",
     "R011",
+    "R012",
     "R013",
     "R014",
     "R015",
@@ -21,14 +29,7 @@
     "R020",
     "R021",
     "R022",
-    "R023",
-    "C001",
-    "C002",
-    "C003",
-    "C006",
-    "C007",
-    "C008",
-    "C010"
+    "R023"
   ],
   "sources": [
     {
@@ -118,6 +119,16 @@
         {
           "offset_seconds": 700,
           "raw": "Nov 12 08:11:40 srv-web-01 nginx: 192.168.133.20 - alice [12/Nov/2026:08:11:40 +0000] \"GET /status HTTP/1.1\" 200 2"
+        }
+      ]
+    },
+    {
+      "source_type": "LINUX_AUDITD",
+      "hostname": "srv-backup-02",
+      "lines": [
+        {
+          "offset_seconds": 30,
+          "raw": "type=EXECVE msg=audit(1763032830.100:2001): argc=5 a0=\"/usr/bin/rsync\" a1=\"-av\" a2=\"--delete\" a3=\"/srv/data/\" a4=\"/backup/data/\""
         }
       ]
     }
