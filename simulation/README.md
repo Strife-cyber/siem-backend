@@ -127,8 +127,8 @@ pipeline out.
 
 - **R009 Impossible Travel** — needs a GeoIP database; the collector emits no geo fields and no GeoIP service is configured. Deferred until geo enrichment exists.
 - **R012 Linux Shell Abuse** — IMPLEMENTED (auditd EXECVE telemetry from siem-collector). Detects reverse shells, download-and-execute cradles and encoded payloads in auditd `command_line`.
-- **R016 Linux file access / R024 DNS tunneling / C004/C005/C009** — still deferred: auditd PATH/SYSCALL file-access correlation, DNS `domain` field, and user-attributed `bytes_out` telemetry do not exist yet.
-- **R016 SSH Persistence (authorized_keys)** — no Linux file-access telemetry in the collector (FILE_ACCESS is Windows-only).
+- **R016 SSH Persistence (authorized_keys)** — IMPLEMENTED (auditd PATH records from siem-collector). Matches any `authorized_keys` file access.
+- **R024 DNS tunneling / C004/C005/C009** — still deferred: DNS `domain` field and user-attributed `bytes_out` telemetry do not exist yet.
 - **R019 Firewall Modification** — collector has no firewall *configuration-change* events (only allow/deny traffic events).
 - **R024 DNS Tunneling** — no DNS telemetry collected.
 - **R025 Unusual Data Staging** — needs file-operation/content visibility the collector does not provide.

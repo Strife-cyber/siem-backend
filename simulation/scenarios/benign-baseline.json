@@ -24,6 +24,7 @@
     "R013",
     "R014",
     "R015",
+    "R016",
     "R017",
     "R018",
     "R020",
@@ -129,6 +130,16 @@
         {
           "offset_seconds": 30,
           "raw": "type=EXECVE msg=audit(1763032830.100:2001): argc=5 a0=\"/usr/bin/rsync\" a1=\"-av\" a2=\"--delete\" a3=\"/srv/data/\" a4=\"/backup/data/\""
+        }
+      ]
+    },
+    {
+      "source_type": "LINUX_AUDITD",
+      "hostname": "srv-app-03",
+      "lines": [
+        {
+          "offset_seconds": 40,
+          "raw": "type=PATH msg=audit(1763036440.100:4001): item=0 name=\"/home/deploy/app.log\" nametype=CREATE mode=0100644 ouid=1002 ogid=1002 rdev=00:00"
         }
       ]
     }
