@@ -289,3 +289,92 @@ model ApiKey {
   @@unique([key_hash], name: "api_key_hash_unique")
   @@map("api_keys")
 }
+
+// ─────────────────────────────────────────────────────────────
+// TDIR Phase 1 — Entity graph + decaying risk scoring
+// ─────────────────────────────────────────────────────────────
+
+model Entity {
+  id                String    @id @default(uuid()) @db.Uuid
+  entity_type       String    @db.VarChar(30) // IP | HOST | USER | PROCESS | FILE | DOMAIN
+  value             String    @db.VarChar(512)
+  first_seen_at     DateTime  @default(now()) @db.Timestamptz()
+  last_seen_at      DateTime  @default(now()) @db.Timestamptz()
+  observation_count Int       @default(0)
+  risk_score        Float     @default(0)
+  risk_updated_at   DateTime? @db.Timestamptz()
+  created_at        DateTime  @default(now()) @db.Timestamptz()
+  updated_at        DateTime  @updatedAt @db.Timestamptz()
+
+  observations EntityObservation[]
+  risk_events  EntityRiskEvent[]
+  edges_out    EntityEdge[]       @relation("EntityEdgeSource")
+  edges_in     EntityEdge[]       @relation("EntityEdgeTarget")
+
+  @@unique([entity_type, value], name: "entities_type_value_key")
+  @@index([entity_type], name: "idx_entities_type")
+  @@map("entities")
+}
+
+model EntityEdge {
+  id               String   @id @default(uuid()) @db.Uuid
+  source_entity_id String   @db.Uuid
+  target_entity_id String   @db.Uuid
+  relationship     String   @db.VarChar(50) // CONTACTED | USED_ACCOUNT | AUTHENTICATED_ON | ...
+  first_seen_at    DateTime @default(now()) @db.Timestamptz()
+  last_seen_at     DateTime @default(now()) @db.Timestamptz()
+  observation_count Int     @default(0)
+  last_rule_id     String?  @db.VarChar(50)
+  last_incident_id String?  @db.Uuid
+  created_at       DateTime @default(now()) @db.Timestamptz()
+  updated_at       DateTime @updatedAt @db.Timestamptz()
+
+  source Entity @relation("EntityEdgeSource", fields: [source_entity_id], references: [id], onDelete: Cascade)
+  target Entity @relation("EntityEdgeTarget", fields: [target_entity_id], references: [id], onDelete: Cascade)
+
+  @@unique([source_entity_id, target_entity_id, relationship], name: "entity_edges_unique")
+  @@index([target_entity_id], name: "idx_entity_edges_target")
+  @@map("entity_edges")
+}
+
+model EntityObservation {
+  id          String   @id @default(uuid()) @db.Uuid
+  entity_id   String   @db.Uuid
+  incident_id String?  @db.Uuid
+  rule_id     String?  @db.VarChar(50)
+  observed_at DateTime @db.Timestamptz()
+  attributes  Json?
+  created_at  DateTime @default(now()) @db.Timestamptz()
+
+  entity Entity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+
+  @@index([entity_id, observed_at], name: "idx_entity_obs_entity_time")
+  @@map("entity_observations")
+}
+
+model EntityRiskEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  entity_id   String   @db.Uuid
+  rule_id     String   @db.VarChar(50)
+  incident_id String   @db.Uuid
+  points      Float
+  observed_at DateTime @db.Timestamptz()
+  created_at  DateTime @default(now()) @db.Timestamptz()
+
+  entity Entity @relation(fields: [entity_id], references: [id], onDelete: Cascade)
+
+  @@unique([entity_id, rule_id, incident_id], name: "entity_risk_events_dedup")
+  @@index([entity_id, observed_at], name: "idx_entity_risk_entity_time")
+  @@map("entity_risk_events")
+}
+
+model RiskScoringConfig {
+  id                    Int      @id @default(1)
+  decay_half_life_hours Float    @default(24)
+  max_score             Float    @default(100)
+  weights               Json?
+  updated_at            DateTime @updatedAt @db.Timestamptz()
+  created_at            DateTime @default(now()) @db.Timestamptz()
+
+  @@map("risk_scoring_config")
+}

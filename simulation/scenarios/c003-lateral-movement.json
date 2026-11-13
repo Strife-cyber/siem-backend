@@ -1,0 +1,48 @@
+{
+  "name": "c003-lateral-movement",
+  "description": "C003: the same source IP authenticates to two distinct hosts (file server + database) within 30 minutes after failed-then-successful logins. Expects C003 HIGH correlation incident and isolate_endpoint CONFIRM queued.",
+  "base_time": "2026-11-12T11:06:00Z",
+  "requires_rules": ["R001", "R008", "C003"],
+  "sources": [
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "srv-fs-01",
+      "lines": [
+        { "offset_seconds": 0, "raw": "Nov 12 10:10:00 srv-fs-01 sshd[6101]: Failed password for svc_file from 10.3.0.5 port 54001 ssh2" },
+        { "offset_seconds": 2, "raw": "Nov 12 10:10:02 srv-fs-01 sshd[6102]: Failed password for svc_file from 10.3.0.5 port 54002 ssh2" },
+        { "offset_seconds": 4, "raw": "Nov 12 10:10:04 srv-fs-01 sshd[6103]: Failed password for svc_file from 10.3.0.5 port 54003 ssh2" },
+        { "offset_seconds": 6, "raw": "Nov 12 10:10:06 srv-fs-01 sshd[6104]: Failed password for svc_file from 10.3.0.5 port 54004 ssh2" },
+        { "offset_seconds": 8, "raw": "Nov 12 10:10:08 srv-fs-01 sshd[6105]: Failed password for svc_file from 10.3.0.5 port 54005 ssh2" },
+        { "offset_seconds": 10, "raw": "Nov 12 10:10:10 srv-fs-01 sshd[6106]: Accepted password for svc_file from 10.3.0.5 port 54006 ssh2" }
+      ]
+    },
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "srv-db-01",
+      "lines": [
+        { "offset_seconds": 20, "raw": "Nov 12 10:10:20 srv-db-01 sshd[7101]: Failed password for svc_file from 10.3.0.5 port 55001 ssh2" },
+        { "offset_seconds": 22, "raw": "Nov 12 10:10:22 srv-db-01 sshd[7102]: Failed password for svc_file from 10.3.0.5 port 55002 ssh2" },
+        { "offset_seconds": 24, "raw": "Nov 12 10:10:24 srv-db-01 sshd[7103]: Failed password for svc_file from 10.3.0.5 port 55003 ssh2" },
+        { "offset_seconds": 26, "raw": "Nov 12 10:10:26 srv-db-01 sshd[7104]: Failed password for svc_file from 10.3.0.5 port 55004 ssh2" },
+        { "offset_seconds": 28, "raw": "Nov 12 10:10:28 srv-db-01 sshd[7105]: Failed password for svc_file from 10.3.0.5 port 55005 ssh2" },
+        { "offset_seconds": 30, "raw": "Nov 12 10:10:30 srv-db-01 sshd[7106]: Accepted password for svc_file from 10.3.0.5 port 55006 ssh2" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R008", "min_severity": "HIGH", "min_count": 1 },
+      { "rule_id": "C003", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_playbook_executions": [
+      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 }
+    ],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "value": "10.3.0.5", "min_score": 40 }
+    ],
+    "expect_entity_edges": [
+      { "source_type": "IP", "source_value": "10.3.0.5", "relationship": "CONTACTED", "target_type": "HOST", "target_value": "srv-fs-01" },
+      { "source_type": "IP", "source_value": "10.3.0.5", "relationship": "CONTACTED", "target_type": "HOST", "target_value": "srv-db-01" }
+    ]
+  }
+}

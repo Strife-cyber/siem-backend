@@ -1,0 +1,61 @@
+{
+  "name": "c001-recon-to-access",
+  "description": "C001: port scan (R005) + brute force (R001) + successful login (R008) from one source IP against one host within 30 minutes. Expects C001 CRITICAL correlation incident, isolate_endpoint CONFIRM queued, entity risk and edges recorded.",
+  "base_time": "2026-11-12T11:06:00Z",
+  "requires_rules": ["R001", "R005", "R008", "C001", "C002"],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "PFSENSE-01",
+      "lines": [
+        { "offset_seconds": 0,  "raw": "ALLOW 10.1.0.5 10.1.0.11 51234 22 TCP" },
+        { "offset_seconds": 2,  "raw": "ALLOW 10.1.0.5 10.1.0.12 51235 80 TCP" },
+        { "offset_seconds": 4,  "raw": "ALLOW 10.1.0.5 10.1.0.13 51236 443 TCP" },
+        { "offset_seconds": 6,  "raw": "ALLOW 10.1.0.5 10.1.0.11 51237 2222 TCP" },
+        { "offset_seconds": 8,  "raw": "ALLOW 10.1.0.5 10.1.0.12 51238 8080 TCP" },
+        { "offset_seconds": 10, "raw": "ALLOW 10.1.0.5 10.1.0.13 51239 3306 TCP" },
+        { "offset_seconds": 12, "raw": "ALLOW 10.1.0.5 10.1.0.11 51240 22 TCP" },
+        { "offset_seconds": 14, "raw": "ALLOW 10.1.0.5 10.1.0.12 51241 80 TCP" },
+        { "offset_seconds": 16, "raw": "ALLOW 10.1.0.5 10.1.0.13 51242 443 TCP" },
+        { "offset_seconds": 18, "raw": "ALLOW 10.1.0.5 10.1.0.11 51243 25 TCP" },
+        { "offset_seconds": 20, "raw": "ALLOW 10.1.0.5 10.1.0.12 51244 445 TCP" },
+        { "offset_seconds": 22, "raw": "ALLOW 10.1.0.5 10.1.0.13 51245 3389 TCP" },
+        { "offset_seconds": 24, "raw": "ALLOW 10.1.0.5 10.1.0.11 51246 21 TCP" },
+        { "offset_seconds": 26, "raw": "ALLOW 10.1.0.5 10.1.0.12 51247 110 TCP" },
+        { "offset_seconds": 28, "raw": "ALLOW 10.1.0.5 10.1.0.13 51248 143 TCP" }
+      ]
+    },
+    {
+      "source_type": "LINUX_AUTH",
+      "hostname": "srv-dc-01",
+      "lines": [
+        { "offset_seconds": 60, "raw": "Nov 12 10:01:00 srv-dc-01 sshd[4101]: Failed password for admin from 10.1.0.5 port 52001 ssh2" },
+        { "offset_seconds": 62, "raw": "Nov 12 10:01:02 srv-dc-01 sshd[4102]: Failed password for admin from 10.1.0.5 port 52002 ssh2" },
+        { "offset_seconds": 64, "raw": "Nov 12 10:01:04 srv-dc-01 sshd[4103]: Failed password for admin from 10.1.0.5 port 52003 ssh2" },
+        { "offset_seconds": 66, "raw": "Nov 12 10:01:06 srv-dc-01 sshd[4104]: Failed password for admin from 10.1.0.5 port 52004 ssh2" },
+        { "offset_seconds": 68, "raw": "Nov 12 10:01:08 srv-dc-01 sshd[4105]: Failed password for admin from 10.1.0.5 port 52005 ssh2" },
+        { "offset_seconds": 70, "raw": "Nov 12 10:01:10 srv-dc-01 sshd[4106]: Failed password for admin from 10.1.0.5 port 52006 ssh2" },
+        { "offset_seconds": 75, "raw": "Nov 12 10:01:15 srv-dc-01 sshd[4107]: Accepted password for admin from 10.1.0.5 port 52007 ssh2" }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R005", "min_severity": "WARNING", "min_count": 1 },
+      { "rule_id": "R001", "min_severity": "WARNING", "min_count": 1 },
+      { "rule_id": "R008", "min_severity": "HIGH", "min_count": 1 },
+      { "rule_id": "C001", "min_severity": "CRITICAL", "min_count": 1 },
+      { "rule_id": "C002", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_playbook_executions": [
+      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 },
+      { "playbook_name": "temporary_block", "status": "EXECUTED", "min_count": 1 }
+    ],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "value": "10.1.0.5", "min_score": 60 }
+    ],
+    "expect_entity_edges": [
+      { "source_type": "IP", "source_value": "10.1.0.5", "relationship": "CONTACTED", "target_type": "HOST", "target_value": "srv-dc-01" }
+    ]
+  }
+}

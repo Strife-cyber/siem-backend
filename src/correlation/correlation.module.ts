@@ -4,6 +4,7 @@ import { Queue } from 'bullmq';
 import { CorrelationService } from './correlation.service';
 import { CorrelationScheduler } from './correlation.scheduler';
 import { SoarModule } from '../soar/soar.module';
+import { EntitiesModule } from '../entities/entities.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SoarModule } from '../soar/soar.module';
       name: 'reports',
     }),
     SoarModule,
+    EntitiesModule,
   ],
   providers: [CorrelationService, CorrelationScheduler],
 })

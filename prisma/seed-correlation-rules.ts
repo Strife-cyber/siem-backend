@@ -9,7 +9,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 import 'dotenv/config';
 
-
 const RULES = [
   {
     id: 'R001',
@@ -101,6 +100,71 @@ const RULES = [
     confidence_weight: 70,
     is_active: false,
   },
+  {
+    id: 'R008',
+    name: 'Successful Login After Failures',
+    tactic: 'TA0001',
+    technique: 'T1078',
+    definition: {
+      time_window_seconds: 900,
+      interval_seconds: 300,
+      threshold: 5,
+      max_time_span_seconds: 900,
+      source_types: [
+        'linux_auth',
+        'windows_security',
+        'active_directory',
+        'linux',
+      ],
+      actions: ['login', 'user_login', 'failed_login', 'auth_event'],
+      outcomes: ['failure', 'success'],
+    },
+    confidence_weight: 85,
+    is_active: false,
+  },
+  // ── Layer-2 attack correlation rules (C001–C003) ──
+  {
+    id: 'C001',
+    name: 'Recon to Access (Scan/Brute → Compromise)',
+    tactic: 'TA0001',
+    technique: 'T1078',
+    definition: {
+      layer: 2,
+      prerequisite_rules: ['R005', 'R001', 'R008'],
+      time_window_seconds: 1800,
+      response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+    },
+    confidence_weight: 90,
+    is_active: false,
+  },
+  {
+    id: 'C002',
+    name: 'Brute Force to Account Compromise',
+    tactic: 'TA0006',
+    technique: 'T1110',
+    definition: {
+      layer: 2,
+      prerequisite_rules: ['R001', 'R008'],
+      time_window_seconds: 1800,
+      response: { playbook: 'temporary_block', mode: 'AUTO' },
+    },
+    confidence_weight: 85,
+    is_active: false,
+  },
+  {
+    id: 'C003',
+    name: 'Lateral Movement Across Hosts',
+    tactic: 'TA0008',
+    technique: 'T1021',
+    definition: {
+      layer: 2,
+      prerequisite_rules: ['R001', 'R002', 'R008'],
+      time_window_seconds: 1800,
+      response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+    },
+    confidence_weight: 80,
+    is_active: false,
+  },
 ];
 
 async function main() {
@@ -146,7 +210,7 @@ async function main() {
 
   await prisma.$disconnect();
   console.log(
-    '\nDone. All 5 rules seeded (set to inactive — activate via API).',
+    '\nDone. All rules seeded (set to inactive — activate via API or simulation harness).',
   );
 }
 
