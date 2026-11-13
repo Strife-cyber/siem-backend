@@ -1,4 +1,4 @@
-# Smart SIEM CTU — Caddy Configuration
+# Smart SIEM — Caddy Configuration
 
 http://localhost, http://strife-cyber.taild0a5b5.ts.net {
     # Security headers
@@ -14,23 +14,6 @@ http://localhost, http://strife-cyber.taild0a5b5.ts.net {
     # Compress
     encode gzip
 
-    # ── Static assets: serve from disk if exists, fallback to SSR if not ──
-    handle /assets/* {
-        root * /var/www/frontend
-        # Only serve file_server if the file actually exists on disk
-        @asset_file file {
-            try_files {path}
-        }
-        handle @asset_file {
-            file_server
-            header Cache-Control "public, max-age=31536000, immutable"
-        }
-        # File not found → proxy to frontend SSR (handles hash mismatches)
-        handle {
-            reverse_proxy frontend:3001
-        }
-    }
-
     # ── API backend ──
     handle /api/* {
         reverse_proxy app:3000 {
@@ -45,8 +28,9 @@ http://localhost, http://strife-cyber.taild0a5b5.ts.net {
         reverse_proxy app:3000
     }
 
-    # ── Frontend SSR (routes only, assets handled above) ──
+    # ── SPA (static build from Strife-cyber/siem-frontend) ──
+    # The frontend image's own Caddy serves index.html fallback for client-side routes.
     handle {
-        reverse_proxy frontend:3001
+        reverse_proxy frontend:80
     }
 }
