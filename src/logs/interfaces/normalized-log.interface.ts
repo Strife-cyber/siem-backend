@@ -33,6 +33,14 @@ export interface NormalizedLog {
   severity: number;
   /** Original raw log message */
   raw_message: string;
+  /** Process image name (e.g. from Windows 4688 NewProcessName) */
+  process_name?: string;
+  /** Full command line of the process (when the source provides it) */
+  command_line?: string;
+  /** File path targeted by a file-access event */
+  file_path?: string;
+  /** Coarse file operation: 'read' | 'write' | 'delete' | 'access' */
+  file_operation?: string;
   /** Arbitrary tags for enrichment */
   tags?: string[];
   /** SHA-256 hash of the raw message for chain of custody (FR-02.3) */

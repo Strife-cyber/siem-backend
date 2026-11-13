@@ -56,6 +56,22 @@ export class CreateLogDto {
   @IsString()
   outcome?: string;
 
+  @IsOptional()
+  @IsString()
+  process_name?: string;
+
+  @IsOptional()
+  @IsString()
+  command_line?: string;
+
+  @IsOptional()
+  @IsString()
+  file_path?: string;
+
+  @IsOptional()
+  @IsString()
+  file_operation?: string;
+
   @IsInt()
   @Min(0)
   @Max(7)
