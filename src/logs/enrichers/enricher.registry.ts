@@ -4,6 +4,11 @@ import { parseWindowsSecurity } from './windows-security.enricher';
 import { parseLinuxAuth } from './linux-auth.enricher';
 import { parseFirewall } from './firewall.enricher';
 import { parseLinuxGeneric } from './linux-generic.enricher';
+import {
+  parseArpMitm,
+  parseDhcpMitm,
+  parseLlmnrFilterlog,
+} from './mitm.enricher';
 
 /**
  * Enricher function signature.
@@ -18,19 +23,38 @@ export type EnricherFn = (
  * Registry mapping source_type to its enricher.
  * Add new enrichers here as they're created.
  */
+const firewallMitm: EnricherFn = (raw, log) => ({
+  ...parseFirewall(raw, log),
+  ...parseArpMitm(raw, log),
+  ...parseDhcpMitm(raw, log),
+  ...parseLlmnrFilterlog(raw, log),
+});
+
+const linuxSyslogMitm: EnricherFn = (raw, log) => ({
+  ...parseLinuxAuth(raw, log),
+  ...parseArpMitm(raw, log),
+  ...parseDhcpMitm(raw, log),
+});
+
+const linuxGenericMitm: EnricherFn = (raw, log) => ({
+  ...parseLinuxGeneric(raw, log),
+  ...parseArpMitm(raw, log),
+  ...parseDhcpMitm(raw, log),
+});
+
 const enricherRegistry: Record<string, EnricherFn> = {
   windows_security: parseWindowsSecurity,
   linux_auth: parseLinuxAuth,
-  linux: parseLinuxGeneric,
-  firewall: parseFirewall,
+  linux: linuxGenericMitm,
+  firewall: firewallMitm,
   web_proxy: parseFirewall,
-  syslog: parseLinuxAuth,
-  linux_syslog: parseLinuxAuth,
-  linux_network: parseLinuxGeneric,
-  linux_process: parseLinuxGeneric,
-  linux_kernel: parseLinuxGeneric,
-  linux_systemd_journal: parseLinuxGeneric,
-  app: parseLinuxGeneric,
+  syslog: linuxSyslogMitm,
+  linux_syslog: linuxSyslogMitm,
+  linux_network: linuxGenericMitm,
+  linux_process: linuxGenericMitm,
+  linux_kernel: linuxGenericMitm,
+  linux_systemd_journal: linuxGenericMitm,
+  app: linuxGenericMitm,
   active_directory: parseWindowsSecurity,
   windows_application: parseWindowsSecurity,
   traefik: parseFirewall,

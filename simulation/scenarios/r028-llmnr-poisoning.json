@@ -1,0 +1,40 @@
+{
+  "name": "r028-llmnr-poisoning",
+  "description": "R028 (ARNO_SIEM MITM playbook A34): pfSense filterlog shows host 192.168.189.50 answering LLMNR/NBT-NS (UDP 5355/137) to 3 distinct workstations within 10 minutes — the Responder pattern. HIGH, block_ip CONFIRM targets the responder 192.168.189.50 (never the queried identities).",
+  "base_time": "2026-11-10T10:00:00Z",
+  "requires_rules": ["R028"],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "pfsense",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 10 10:00:00 pfsense filterlog: 100,0,anchor1,12345,em0,match,pass,out,4,0x0,0,64,0,0,0,17,udp,60,192.168.189.50,192.168.189.11,5355,5355,0,0,0,0,0,0"
+        },
+        {
+          "offset_seconds": 120,
+          "raw": "Nov 10 10:02:00 pfsense filterlog: 100,0,anchor1,12346,em0,match,pass,out,4,0x0,0,64,0,0,0,17,udp,60,192.168.189.50,192.168.189.12,5355,5355,0,0,0,0,0,0"
+        },
+        {
+          "offset_seconds": 240,
+          "raw": "Nov 10 10:04:00 pfsense filterlog: 100,0,anchor1,12347,em0,match,pass,out,4,0x0,0,64,0,0,0,17,udp,60,192.168.189.50,192.168.189.13,137,137,0,0,0,0,0,0"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R028", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      { "playbook_name": "block_ip", "status": "PENDING", "min_count": 1 }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "value": "192.168.189.50", "min_score": 20 }
+    ]
+  }
+}

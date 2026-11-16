@@ -37,6 +37,10 @@ import { FirewallModificationRule } from './rules/r019-firewall-modification.rul
 import { KerberoastingRule } from './rules/r030-kerberoasting.rule';
 import { AsrepRoastingRule } from './rules/r031-asrep-roasting.rule';
 import { DcsyncRule } from './rules/r032-dcsync.rule';
+import { ArpSpoofingRule } from './rules/r026-arp-spoofing.rule';
+import { RogueDhcpRule } from './rules/r027-rogue-dhcp.rule';
+import { LlmnrPoisoningRule } from './rules/r028-llmnr-poisoning.rule';
+import { DnsGatewayTamperingRule } from './rules/r029-dns-gateway-tampering.rule';
 import { ATTACK_CORRELATION_RULES } from './rules/attack-correlation.rules';
 import type {
   DetectionRule,
@@ -98,6 +102,10 @@ export class CorrelationService {
     new KerberoastingRule(),
     new AsrepRoastingRule(),
     new DcsyncRule(),
+    new ArpSpoofingRule(),
+    new RogueDhcpRule(),
+    new LlmnrPoisoningRule(),
+    new DnsGatewayTamperingRule(),
   ];
 
   /** Layer-2 attack correlation rules (C001–C003) — run after event rules */
