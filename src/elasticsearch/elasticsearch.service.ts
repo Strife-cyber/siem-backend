@@ -159,6 +159,20 @@ export class ElasticsearchService implements OnModuleInit {
               direction: { type: 'keyword', normalizer: 'case_insensitive' },
               protocol: { type: 'keyword', normalizer: 'case_insensitive' },
               duration_seconds: { type: 'integer' },
+              // ---- AD/Kerberos fields (4768/4769/4662/4624) ----
+              preauth_type: { type: 'byte' },
+              ticket_encryption_type: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              spn: { type: 'keyword', normalizer: 'case_insensitive' },
+              logon_id: { type: 'keyword' },
+              subject_user_name: {
+                type: 'keyword',
+                normalizer: 'case_insensitive',
+              },
+              status_code: { type: 'keyword' },
+              replication_right: { type: 'boolean' },
             },
             _meta: {
               version: '1.0',
@@ -202,6 +216,20 @@ export class ElasticsearchService implements OnModuleInit {
             type: 'keyword',
             normalizer: 'case_insensitive',
           },
+          // ---- AD/Kerberos fields (4768/4769/4662/4624) ----
+          preauth_type: { type: 'byte' },
+          ticket_encryption_type: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
+          spn: { type: 'keyword', normalizer: 'case_insensitive' },
+          logon_id: { type: 'keyword' },
+          subject_user_name: {
+            type: 'keyword',
+            normalizer: 'case_insensitive',
+          },
+          status_code: { type: 'keyword' },
+          replication_right: { type: 'boolean' },
         },
       });
     } catch (error) {
@@ -242,6 +270,14 @@ export class ElasticsearchService implements OnModuleInit {
           direction: { type: 'keyword' },
           protocol: { type: 'keyword' },
           duration_seconds: { type: 'integer' },
+          // ---- AD/Kerberos fields (4768/4769/4662/4624) ----
+          preauth_type: { type: 'byte' },
+          ticket_encryption_type: { type: 'keyword' },
+          spn: { type: 'keyword' },
+          logon_id: { type: 'keyword' },
+          subject_user_name: { type: 'keyword' },
+          status_code: { type: 'keyword' },
+          replication_right: { type: 'boolean' },
         },
       });
       this.logger.log(

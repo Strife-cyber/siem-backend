@@ -1,0 +1,54 @@
+{
+  "name": "r030-kerberoasting",
+  "description": "R030: Kerberoasting (T1558.003) \u2014 3 distinct RC4-encrypted Kerberos service ticket requests (4769) from the attacker IP against service accounts; must create an R030 HIGH incident and queue isolate_endpoint for analyst approval (CONFIRM).",
+  "base_time": "2026-11-16T10:00:00Z",
+  "requires_rules": [
+    "R030"
+  ],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "SRV-DC-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4769</EventID></System><EventData><Data Name=\"TargetUserName\">attacker</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"ServiceName\">MSSQLSvc/sql01.corp.local</Data><Data Name=\"TicketEncryptionType\">0x17</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0x0</Data><Data Name=\"TicketOptions\">0x40810000</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 6,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4769</EventID></System><EventData><Data Name=\"TargetUserName\">attacker</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"ServiceName\">HTTP/web01.corp.local</Data><Data Name=\"TicketEncryptionType\">0x17</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0x0</Data><Data Name=\"TicketOptions\">0x40810000</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 12,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4769</EventID></System><EventData><Data Name=\"TargetUserName\">attacker</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"ServiceName\">ldap/dc02.corp.local</Data><Data Name=\"TicketEncryptionType\">0x1</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0x0</Data><Data Name=\"TicketOptions\">0x40810000</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R030",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      {
+        "entity_type": "IP",
+        "min_score": 20,
+        "value": "192.168.189.50"
+      }
+    ]
+  }
+}

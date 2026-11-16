@@ -40,6 +40,17 @@ export function resetProtectedIpCache(): void {
   protectedIps = null;
 }
 
+/**
+ * True when the value parses as an IP address and is on the protected
+ * infrastructure list (SIEM host, AD DC, loopback, env-configured).
+ * Hostnames always return false.
+ */
+export function isProtectedIp(value: string): boolean {
+  const ip = value.trim();
+  if (!net.isIP(ip)) return false;
+  return getProtectedIps().includes(ip);
+}
+
 export interface ValidationResult {
   valid: boolean;
   error?: string;

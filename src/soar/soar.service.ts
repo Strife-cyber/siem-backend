@@ -146,14 +146,17 @@ export class SoarService {
    * playbooks, `{ success: false }` from alias playbooks, and
    * `{ blocked|isolated: [], failed: [...] }` when every target failed.
    * Partial failures (some targets succeeded) still count as executed —
-   * the payload records which targets failed.
+   * the payload records which targets failed. Targets skipped because they
+   * are protected infrastructure count as not executed when nothing was
+   * actually isolated/blocked.
    */
   private playbookFailed(payload: Record<string, unknown>): boolean {
     if (typeof payload.error === 'string') return true;
     if (payload.success === false) return true;
 
     const failed = Array.isArray(payload.failed) ? payload.failed.length : 0;
-    if (failed === 0) return false;
+    const skipped = Array.isArray(payload.skipped) ? payload.skipped.length : 0;
+    if (failed === 0 && skipped === 0) return false;
 
     const anySucceeded = ['blocked', 'isolated'].some((key) => {
       const value = payload[key];
@@ -216,11 +219,15 @@ export class SoarService {
       }
 
       case 'isolate_endpoint': {
-        if (hosts.length === 0)
-          return { skipped: true, reason: 'no hosts to isolate' };
+        // Hostnames are preferred; for IP-only incidents (e.g. AD Kerberos
+        // attacks observed on a DC) fall back to the incident IPs. The
+        // playbook refuses protected infrastructure IPs either way.
+        const targets = hosts.length > 0 ? hosts : ips;
+        if (targets.length === 0)
+          return { skipped: true, reason: 'no hosts or IPs to isolate' };
         const result = await isolateHostPlaybook(
           this.agent,
-          hosts,
+          targets,
           'Suspicious host detected',
           this.logger,
         );

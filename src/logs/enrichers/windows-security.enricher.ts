@@ -30,6 +30,17 @@ function xmlField(raw: string, name: string): string | undefined {
   return undefined;
 }
 
+/** Directory-replication property GUIDs used by DCSync (event 4662). */
+const REPLICATION_GUID_PREFIXES = ['1131f6aa', '1131f6ad', '89e95b76'];
+
+/** Override source_ip with the real client IP from an event's IpAddress field. */
+function applySourceIp(enriched: Partial<EnrichedLog>, raw: string): void {
+  const src = xmlField(raw, 'IpAddress');
+  if (src && src !== '0.0.0.0' && src !== '127.0.0.1') {
+    enriched.source_ip = src;
+  }
+}
+
 export function parseWindowsSecurity(
   raw: string,
   _log: NormalizedLog,
@@ -153,6 +164,55 @@ export function parseWindowsSecurity(
     if (src && src !== '0.0.0.0' && src !== '127.0.0.1') {
       enriched.source_ip = src;
     }
+
+    // Logon session ID — lets DCSync (4662) join back to this logon
+    const logonId = xmlField(raw, 'TargetLogonId');
+    if (logonId) enriched.logon_id = logonId;
+  }
+
+  // ---- Event 4768: Kerberos TGT requested (AS-REP Roasting, R031) ----
+  if (enriched.event_id === 4768) {
+    // TargetUserName is the account the TGT was requested for — R031/R030
+    // group on it, and the collector may not always populate user_principal.
+    const tgtUser = xmlField(raw, 'TargetUserName');
+    if (tgtUser) enriched.user_principal = tgtUser;
+    const preauth = xmlField(raw, 'PreAuthType');
+    if (preauth) {
+      const n = parseInt(preauth, 10);
+      if (!Number.isNaN(n)) enriched.preauth_type = n;
+    }
+    const status = xmlField(raw, 'Status');
+    if (status) enriched.status_code = status.toLowerCase();
+    applySourceIp(enriched, raw);
+  }
+
+  // ---- Event 4769: Kerberos service ticket requested (Kerberoasting, R030) ----
+  if (enriched.event_id === 4769) {
+    const tgtUser = xmlField(raw, 'TargetUserName');
+    if (tgtUser) enriched.user_principal = tgtUser;
+    const spn = xmlField(raw, 'ServiceName');
+    if (spn) enriched.spn = spn;
+    const enc = xmlField(raw, 'TicketEncryptionType');
+    if (enc) enriched.ticket_encryption_type = enc.toLowerCase();
+    const status = xmlField(raw, 'Status');
+    if (status) enriched.status_code = status.toLowerCase();
+    applySourceIp(enriched, raw);
+  }
+
+  // ---- Event 4662: Directory service access (DCSync, R032) ----
+  if (enriched.event_id === 4662) {
+    const subject = xmlField(raw, 'SubjectUserName');
+    if (subject) enriched.subject_user_name = subject;
+    const logonId = xmlField(raw, 'SubjectLogonId');
+    if (logonId) enriched.logon_id = logonId;
+    const properties = xmlField(raw, 'Properties') ?? '';
+    const propsLower = properties.toLowerCase();
+    if (REPLICATION_GUID_PREFIXES.some((g) => propsLower.includes(g))) {
+      enriched.replication_right = true;
+    }
+    const status = xmlField(raw, 'Status');
+    if (status) enriched.status_code = status.toLowerCase();
+    applySourceIp(enriched, raw);
   }
 
   return enriched;
