@@ -180,6 +180,39 @@ describe('DcsyncRule (R032)', () => {
     expect(results[0].related_entities?.hosts).toEqual([]);
   });
 
+  it('ignores a 4624 from a different DC sharing the same logon ID', async () => {
+    // Windows logon IDs are computer-local: DC02 also has a 0x3e7 session.
+    const otherDc4624 = hit({
+      event_id: 4624,
+      logon_id: '0x3e7',
+      hostname: 'srv-dc-02',
+      source_ip: '192.168.189.99',
+    });
+    const results = await rule.detect(
+      fakeEs([dcsync4662, otherDc4624]),
+      since,
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].severity).toBe('CRITICAL');
+    expect(results[0].related_entities?.ips).toEqual([]);
+    expect(results[0].summary).toContain('manual containment');
+  });
+
+  it('prefers the 4624 from the same DC when logon IDs collide', async () => {
+    const otherDc4624 = hit({
+      event_id: 4624,
+      logon_id: '0x3e7',
+      hostname: 'srv-dc-02',
+      source_ip: '192.168.189.99',
+    });
+    const results = await rule.detect(
+      fakeEs([dcsync4662, otherDc4624, logon4624]),
+      since,
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].related_entities?.ips).toEqual(['192.168.189.50']);
+  });
+
   it('fires CRITICAL with unresolved IP when no matching logon exists', async () => {
     const results = await rule.detect(fakeEs([dcsync4662]), since);
     expect(results).toHaveLength(1);

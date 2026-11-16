@@ -68,16 +68,20 @@ export async function fetchAdEvents(
  * Resolve the source IP of a directory-service access (4662) via the
  * matching logon-success event (4624) carrying the same logon session ID.
  * Searches a 24 h lookback — the logon typically precedes the replication.
+ * Windows logon IDs are computer-local, so when the 4662 host is known the
+ * candidate 4624 must come from the same host; otherwise two DCs sharing an
+ * ID (e.g. 0x3e7) would attribute the incident to an unrelated session.
  */
 export async function resolveLogonSourceIp(
   es: ElasticsearchService,
   logonId: string | undefined,
+  hostname?: string,
 ): Promise<string | undefined> {
   if (!logonId) return undefined;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const result = await es.getClient().search({
     index: 'ctu-logs',
-    size: 1,
+    size: 10,
     query: {
       bool: {
         filter: [
@@ -96,8 +100,16 @@ export async function resolveLogonSourceIp(
     },
     sort: [{ normalized_at: 'desc' }],
   });
-  const hit = result.hits.hits[0] as { _source: AdHit } | undefined;
-  const ip = hit?._source?.source_ip;
+  const hits = (result.hits.hits as Array<{ _source: AdHit }>).map(
+    (h) => h._source,
+  );
+  const match = hostname
+    ? hits.find(
+        (h) =>
+          (h.hostname ?? '').toLowerCase() === hostname.toLowerCase(),
+      )
+    : hits[0];
+  const ip = match?.source_ip;
   return ip && ip !== '0.0.0.0' ? ip : undefined;
 }
 

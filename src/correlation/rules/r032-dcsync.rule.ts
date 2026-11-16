@@ -57,7 +57,7 @@ export class DcsyncRule implements DetectionRule {
       if (isMachineAccount(subject)) continue; // DCs/machine accounts
       if (allowed.has(subject.toLowerCase())) continue;
 
-      const ip = await resolveLogonSourceIp(es, e.logon_id);
+      const ip = await resolveLogonSourceIp(es, e.logon_id, e.hostname);
       results.push({
         rule_id: this.id,
         rule_name: this.name,
