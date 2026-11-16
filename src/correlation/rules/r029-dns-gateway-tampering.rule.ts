@@ -145,7 +145,7 @@ export class DnsGatewayTamperingRule implements DetectionRule {
       // `cat /etc/resolv.conf`. Only route MODIFICATIONS and resolv.conf
       // WRITES count as process-level indicators.
       const routeTamper =
-        /\b(?:ip\s+)?route\s+(?:add|del|delete|replace|change|set)\b[^;|&]*\bdefault\b/.test(
+        /\b(?:ip\s+)?route\s+(?:add|append|prepend|del|delete|replace|change|set|flush)\b[^;|&]*\bdefault\b/.test(
           cl,
         );
       const resolvWrite =
