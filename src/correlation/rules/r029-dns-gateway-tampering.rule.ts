@@ -141,24 +141,54 @@ export class DnsGatewayTamperingRule implements DetectionRule {
       const fp = (h.file_path ?? '').toLowerCase();
       const cl = (h.command_line ?? h.raw_message ?? '').toLowerCase();
       const raw = (h.raw_message ?? '').toLowerCase();
+      // Read-only inspection is not tampering: `ip route show default`,
+      // `cat /etc/resolv.conf`. Only route MODIFICATIONS and resolv.conf
+      // WRITES count as process-level indicators.
+      const routeTamper =
+        /\b(?:ip\s+)?route\s+(?:add|del|delete|replace|change|set)\b[^;|&]*\bdefault\b/.test(
+          cl,
+        );
+      const resolvWrite =
+        /(?:^|[\s;&|])(?:echo|printf)\b[^;|]*>\s*\/etc\/resolv\.conf/.test(
+          cl,
+        ) ||
+        /\btee\s+(?:-a\s+)?\/etc\/resolv\.conf\b/.test(cl) ||
+        /\bsed\s+-i[^;|]*\/etc\/resolv\.conf/.test(cl);
       return (
         fp === '/etc/resolv.conf' ||
-        /\broute\b.*\bdefault\b|\bdefault\b.*\bvia\b/.test(cl) ||
+        routeTamper ||
+        resolvWrite ||
         /"(get|post)\s+\/login/.test(raw) ||
         /"(get|post)\s+[^ ]*\/login/.test(raw)
       );
     });
     if (indicators.length === 0) return [];
 
-    // Escalation: ARP spoofing evidence on the same host in the window.
-    // Only strong (non-nginx) indicators escalate — nginx access logs carry
-    // no scheme/port, so a /login match may be an ordinary HTTPS login and
-    // must stay WARNING on its own.
+    // Alert-only rule (no playbook), so listing hosts is safe.
     const hostnames = [
       ...new Set(indicators.map((e) => e.hostname).filter(Boolean)),
     ] as string[];
+
+    // Escalation: ARP spoofing evidence on the SAME host in the window.
+    // Only hosts carrying a STRONG (non-nginx) indicator may escalate, and
+    // the ARP query is restricted to those hosts — otherwise a DNS
+    // indicator on host A plus an unrelated /login on host B plus B's ARP
+    // evidence would produce a HIGH incident for A. nginx access logs
+    // carry no scheme/port, so a /login match may be an ordinary HTTPS
+    // login and must stay WARNING on its own.
+    const strongHostnames = [
+      ...new Set(
+        indicators
+          .filter(
+            (e) =>
+              e.source_type !== 'nginx_access' && e.source_type !== 'nginx',
+          )
+          .map((e) => e.hostname)
+          .filter(Boolean),
+      ),
+    ] as string[];
     let arpEvidence = false;
-    if (hostnames.length) {
+    if (strongHostnames.length) {
       const arp = await search(
         es,
         [
@@ -168,14 +198,11 @@ export class DnsGatewayTamperingRule implements DetectionRule {
               action: ['arp_ip_conflict', 'arp_table_change'],
             },
           },
-          { terms: { hostname: hostnames } },
+          { terms: { hostname: strongHostnames } },
         ],
         1,
       );
-      const strong = indicators.some(
-        (e) => e.source_type !== 'nginx_access' && e.source_type !== 'nginx',
-      );
-      arpEvidence = strong && arp.length > 0;
+      arpEvidence = arp.length > 0;
     }
 
     const severity = arpEvidence ? 'HIGH' : 'WARNING';

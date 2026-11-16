@@ -105,10 +105,13 @@ export class RogueDhcpRule implements DetectionRule {
           `Rogue DHCP server(s) offering leases: ${[...new Set(rogue.map((e) => e.dhcp_server_ip ?? e.source_ip))].join(', ')} ` +
           `(allowed: ${[...allowed].join(', ') || 'none configured'})`,
         related_entities: {
+          // SAFETY: only the rogue server is a containment target. The DHCP
+          // client (source_ip / reporting host) is the victim — never list
+          // it, or approval would isolate an innocent workstation.
           ips: [
             ...new Set(
               rogue
-                .flatMap((e) => [e.dhcp_server_ip, e.source_ip])
+                .map((e) => e.dhcp_server_ip ?? e.source_ip)
                 .filter((x): x is string => !!x && x !== '0.0.0.0'),
             ),
           ],

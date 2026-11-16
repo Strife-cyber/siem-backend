@@ -129,14 +129,14 @@ export class ArpSpoofingRule implements DetectionRule {
           new Date(b.collected_at ?? 0).getTime(),
       );
       for (let i = 0; i < sorted.length; i++) {
-        const window = sorted.filter(
-          (e) =>
-            Math.abs(
-              new Date(e.collected_at ?? 0).getTime() -
-                new Date(sorted[i].collected_at ?? 0).getTime(),
-            ) <=
-            5 * 60 * 1000,
-        );
+        // Sliding window: ≥3 changes inside SOME 5-minute span. A ±5 min
+        // band around each event doubles the window (events at 0/4/8 min
+        // would falsely qualify).
+        const t0 = new Date(sorted[i].collected_at ?? 0).getTime();
+        const window = sorted.filter((e) => {
+          const t = new Date(e.collected_at ?? 0).getTime();
+          return t >= t0 && t - t0 <= 5 * 60 * 1000;
+        });
         if (window.length >= 3) {
           oscillating.add(ip);
           break;
@@ -187,7 +187,12 @@ export class ArpSpoofingRule implements DetectionRule {
                 (x): x is string =>
                   !!x &&
                   x !== '0.0.0.0' &&
-                  !evs.some((e) => e.arp_usurped_ip === x),
+                  !evs.some(
+                    (e) => e.arp_usurped_ip?.toLowerCase() === x.toLowerCase(),
+                  ) &&
+                  // Gateway/DC IPs appear as the reporting host on motif-A
+                  // table changes — never a containment target.
+                  !protectedIps.has(x.toLowerCase()),
               ),
           ),
         ],

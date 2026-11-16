@@ -695,12 +695,21 @@ export class AdAttackChainRule implements AttackCorrelationRule {
     const dcsyncs = incidents.filter((i) => i.rule_id === 'R032');
     const logins = incidents.filter((i) => i.rule_id === 'R008');
 
-    const alreadyCorrelated = (s1: IncidentRow): boolean =>
-      existing.some(
-        (c) =>
-          c.triggered_at >= s1.triggered_at &&
-          (overlap(ipsOf(c), ipsOf(s1)) || overlap(usersOf(c), usersOf(s1))),
-      );
+    // Dedup per ATTACK, not per user: an existing C012 suppresses a stage-1
+    // incident only when it shares the ATTACKER IP, and — for roasting
+    // chains — a victim account too. The old OR-matching let one attack
+    // suppress an unrelated second attacker IP roasting the same account,
+    // leaving the new attacker IP without containment.
+    const alreadyCorrelated = (
+      s1: IncidentRow,
+      pattern: 'roasting-then-login' | 'dcsync',
+    ): boolean =>
+      existing.some((c) => {
+        if (c.triggered_at < s1.triggered_at) return false;
+        if (!overlap(ipsOf(c), ipsOf(s1))) return false;
+        if (pattern === 'dcsync') return true;
+        return usersOf(s1).length === 0 || overlap(usersOf(c), usersOf(s1));
+      });
 
     const results: AttackCorrelationResult[] = [];
     const fired = new Set<string>();
@@ -736,7 +745,7 @@ export class AdAttackChainRule implements AttackCorrelationRule {
 
     // Pattern B — DCSync alone proves domain compromise
     for (const d of dcsyncs) {
-      if (fired.has(d.id) || alreadyCorrelated(d)) continue;
+      if (fired.has(d.id) || alreadyCorrelated(d, 'dcsync')) continue;
       fired.add(d.id);
       results.push(build(d, null, 'dcsync'));
     }
@@ -779,7 +788,8 @@ export class AdAttackChainRule implements AttackCorrelationRule {
     };
 
     for (const s1 of roastings) {
-      if (fired.has(s1.id) || alreadyCorrelated(s1)) continue;
+      if (fired.has(s1.id) || alreadyCorrelated(s1, 'roasting-then-login'))
+        continue;
       const s1Ips = ipsOf(s1);
       if (s1Ips.length === 0) continue;
       const roastStart = firstOf(s1);
