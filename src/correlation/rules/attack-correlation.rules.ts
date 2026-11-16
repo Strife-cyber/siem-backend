@@ -62,33 +62,6 @@ interface EventBounds {
  * matter for login incidents whose evidence mixes failures and successes:
  * the latest event may be a failure that says nothing about credential use.
  */
-/**
- * ES event ids backing each incident (from incident_event rows). Used by
- * C012 to dedup per ATTACK: an existing C012 incident carries its
- * prerequisite incidents' events as evidence, so a stage-1 incident that
- * shares any evidence id with it is the same attack — even when the
- * incidents expose no IP/user entities at all (e.g. DCSync without a
- * resolved source IP).
- */
-async function loadEvidenceIds(
-  prisma: PrismaService,
-  incidentIds: string[],
-): Promise<Map<string, Set<string>>> {
-  const map = new Map<string, Set<string>>();
-  if (incidentIds.length === 0) return map;
-  const rows = await prisma.incidentEvent.findMany({
-    where: { incident_id: { in: incidentIds }, es_id: { not: null } },
-    select: { incident_id: true, es_id: true },
-  });
-  for (const r of rows) {
-    if (!r.es_id) continue;
-    const set = map.get(r.incident_id) ?? new Set<string>();
-    set.add(r.es_id);
-    map.set(r.incident_id, set);
-  }
-  return map;
-}
-
 async function loadEventBounds(
   prisma: PrismaService,
   ids: string[],
@@ -334,6 +307,24 @@ interface SequenceStageConfig {
   confidence: number;
   summary: (chain: IncidentRow[]) => string;
   response?: { playbook: string; mode: 'AUTO' | 'CONFIRM' };
+  /** Multiple SOAR responses (takes precedence over `response`). */
+  responses?: Array<{ playbook: string; mode: 'AUTO' | 'CONFIRM' }>;
+  /**
+   * Drop chain hostnames from related_entities. Needed when a stage carries
+   * infrastructure hostnames (e.g. the DC in R008): isolate_endpoint prefers
+   * hosts over IPs and must never aim at them (MITM/AD playbook rule).
+   */
+  dropHosts?: boolean;
+  /**
+   * Lookback override: load stage incidents from now-lookbackMs instead of
+   * the incremental `since`, so chains spanning correlation cycles are
+   * still found. Implies cross-cycle dedup via related_entities.dedup_key.
+   */
+  lookbackMs?: number;
+  /** When true, each stage must occur at/after the previous one. */
+  ordered?: boolean;
+  /** Entity predicate override (default: any IP/host/user overlap). */
+  share?: ShareEntityPredicate;
 }
 
 function shareEntity(a: IncidentRow, b: IncidentRow): boolean {
@@ -346,6 +337,11 @@ function shareEntity(a: IncidentRow, b: IncidentRow): boolean {
 }
 
 type ShareEntityPredicate = (a: IncidentRow, b: IncidentRow) => boolean;
+
+/** Stable dedup key stored on correlation incidents (related_entities.dedup_key). */
+function dedupKeyOf(i: IncidentRow): string | undefined {
+  return (i.related_entities as { dedup_key?: string } | null)?.dedup_key;
+}
 
 /**
  * Depth-first stage matcher with backtracking. A greedy first-match can
@@ -372,6 +368,11 @@ function findChain(
     for (const i of sorted) {
       if (used.has(i.id)) continue;
       if (!cfg.stages[stage].includes(i.rule_id ?? '')) continue;
+      if (
+        cfg.ordered &&
+        i.triggered_at.getTime() < cursor.triggered_at.getTime()
+      )
+        continue;
       if (
         Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
         WINDOW_MS
@@ -403,20 +404,33 @@ export function sequenceCorrelation(
     name: cfg.name,
     async detect(prisma: PrismaService, since: Date) {
       const stageRules = cfg.stages.flat();
-      const incidents = await loadIncidents(prisma, since, stageRules);
+      const lookback = cfg.lookbackMs
+        ? new Date(Date.now() - cfg.lookbackMs)
+        : since;
+      const incidents = await loadIncidents(prisma, lookback, stageRules);
       const sorted = [...incidents].sort(
         (a, b) => a.triggered_at.getTime() - b.triggered_at.getTime(),
       );
       const results: AttackCorrelationResult[] = [];
       const fired = new Set<string>();
+      // Cross-cycle dedup for lookback-mode rules: a chain already emitted
+      // (same dedup_key on a previous cycle) must not re-fire.
+      const alreadyEmitted = new Set<string>();
+      if (cfg.lookbackMs) {
+        for (const c of await loadIncidents(prisma, lookback, [this.id])) {
+          const k = dedupKeyOf(c);
+          if (k) alreadyEmitted.add(k);
+        }
+      }
+      const share = cfg.share ?? shareEntity;
 
       for (const start of sorted) {
         if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
-        const chain = findChain(start, cfg, sorted, shareEntity);
+        const chain = findChain(start, cfg, sorted, share);
         if (!chain) continue;
 
         const key = chain.map((c) => c.id).join('|');
-        if (fired.has(key)) continue;
+        if (fired.has(key) || alreadyEmitted.has(key)) continue;
         fired.add(key);
 
         const chainIps = [...new Set(chain.flatMap((c) => ipsOf(c)))];
@@ -431,10 +445,13 @@ export function sequenceCorrelation(
           related_entities: {
             ips: chainIps,
             users: chainUsers,
-            hosts: chainHosts,
+            hosts: cfg.dropHosts ? [] : chainHosts,
+            ...(cfg.lookbackMs ? { dedup_key: key } : {}),
           },
           prerequisite_incident_ids: chain.map((c) => c.id),
-          response: cfg.response,
+          ...(cfg.responses
+            ? { responses: cfg.responses }
+            : { response: cfg.response }),
         });
       }
       return results;
@@ -722,32 +739,20 @@ export class AdAttackChainRule implements AttackCorrelationRule {
     const dcsyncs = incidents.filter((i) => i.rule_id === 'R032');
     const logins = incidents.filter((i) => i.rule_id === 'R008');
 
-    // Dedup per ATTACK, not per user: an existing C012 suppresses a stage-1
-    // incident only when it covers the SAME underlying evidence events
-    // (the prerequisite incidents' events are copied into the C012
-    // incident's events). Entity matching is only a fallback for legacy
-    // incidents without evidence links — empty-entity incidents (e.g. a
-    // DCSync with no resolved source IP) must still dedup, or every
-    // cycle re-fires a CRITICAL and re-queues containment.
-    const evidence = await loadEvidenceIds(prisma, [
-      ...existing.map((c) => c.id),
-      ...roastings.map((i) => i.id),
-      ...dcsyncs.map((i) => i.id),
-    ]);
-    const shareEvidence = (a: string, b: string): boolean => {
-      const ea = evidence.get(a);
-      const eb = evidence.get(b);
-      if (!ea || !eb) return false;
-      for (const x of ea) if (eb.has(x)) return true;
-      return false;
-    };
+    // Dedup per ATTACK via related_entities.dedup_key = the stage-1
+    // incident id (stored by build()). The prerequisite ids are NOT
+    // persisted on the incident row and incident_event rows for
+    // correlation results carry no es_id, so evidence-id matching cannot
+    // work; entity matching remains only as a fallback for legacy C012
+    // incidents created before dedup_key existed.
     const alreadyCorrelated = (
       s1: IncidentRow,
       pattern: 'roasting-then-login' | 'dcsync',
     ): boolean =>
       existing.some((c) => {
         if (c.triggered_at < s1.triggered_at) return false;
-        if (shareEvidence(s1.id, c.id)) return true;
+        const dk = dedupKeyOf(c);
+        if (dk) return dk === s1.id;
         if (!overlap(ipsOf(c), ipsOf(s1))) return false;
         if (pattern === 'dcsync') return true;
         return usersOf(s1).length === 0 || overlap(usersOf(c), usersOf(s1));
@@ -777,6 +782,7 @@ export class AdAttackChainRule implements AttackCorrelationRule {
         ips: union(ipsOf(s1), s2 ? ipsOf(s2) : []),
         users: union(usersOf(s1), s2 ? usersOf(s2) : []),
         hosts: [],
+        dedup_key: s1.id,
       },
       prerequisite_incident_ids: s2 ? [s1.id, s2.id] : [s1.id],
       responses: [

@@ -79,7 +79,10 @@ export class RogueDhcpRule implements DetectionRule {
       (h) => h._source,
     );
     const rogue = hits.filter((h) => {
-      const srv = (h.dhcp_server_ip ?? h.source_ip ?? '').toLowerCase();
+      // Only an explicitly parsed DHCP server IP counts: falling back to
+      // source_ip would treat the DHCP CLIENT (the victim) as the rogue
+      // server and aim isolation at an innocent workstation.
+      const srv = (h.dhcp_server_ip ?? '').toLowerCase();
       return srv && !allowed.has(srv);
     });
     if (rogue.length === 0) return [];
@@ -102,7 +105,7 @@ export class RogueDhcpRule implements DetectionRule {
         severity: 'HIGH',
         confidence_score: 85,
         summary:
-          `Rogue DHCP server(s) offering leases: ${[...new Set(rogue.map((e) => e.dhcp_server_ip ?? e.source_ip))].join(', ')} ` +
+          `Rogue DHCP server(s) offering leases: ${[...new Set(rogue.map((e) => e.dhcp_server_ip))].join(', ')} ` +
           `(allowed: ${[...allowed].join(', ') || 'none configured'})`,
         related_entities: {
           // SAFETY: only the rogue server is a containment target. The DHCP
@@ -111,7 +114,7 @@ export class RogueDhcpRule implements DetectionRule {
           ips: [
             ...new Set(
               rogue
-                .map((e) => e.dhcp_server_ip ?? e.source_ip)
+                .map((e) => e.dhcp_server_ip)
                 .filter((x): x is string => !!x && x !== '0.0.0.0'),
             ),
           ],
