@@ -172,6 +172,10 @@ export function parseWindowsSecurity(
 
   // ---- Event 4768: Kerberos TGT requested (AS-REP Roasting, R031) ----
   if (enriched.event_id === 4768) {
+    // TargetUserName is the account the TGT was requested for — R031/R030
+    // group on it, and the collector may not always populate user_principal.
+    const tgtUser = xmlField(raw, 'TargetUserName');
+    if (tgtUser) enriched.user_principal = tgtUser;
     const preauth = xmlField(raw, 'PreAuthType');
     if (preauth) {
       const n = parseInt(preauth, 10);
@@ -184,6 +188,8 @@ export function parseWindowsSecurity(
 
   // ---- Event 4769: Kerberos service ticket requested (Kerberoasting, R030) ----
   if (enriched.event_id === 4769) {
+    const tgtUser = xmlField(raw, 'TargetUserName');
+    if (tgtUser) enriched.user_principal = tgtUser;
     const spn = xmlField(raw, 'ServiceName');
     if (spn) enriched.spn = spn;
     const enc = xmlField(raw, 'TicketEncryptionType');
