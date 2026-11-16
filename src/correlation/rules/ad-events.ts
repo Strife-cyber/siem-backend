@@ -53,7 +53,15 @@ export async function fetchAdEvents(
       },
     },
   });
-  return (result.hits.hits as Array<{ _source: AdHit }>).map((h) => h._source);
+  // Sort chronologically: R030/R031 compute group time spans from the
+  // first/last hit, which is only meaningful on ordered events.
+  return (result.hits.hits as Array<{ _source: AdHit }>)
+    .map((h) => h._source)
+    .sort(
+      (a, b) =>
+        Date.parse(a.normalized_at ?? a.collected_at ?? '') -
+        Date.parse(b.normalized_at ?? b.collected_at ?? ''),
+    );
 }
 
 /**
