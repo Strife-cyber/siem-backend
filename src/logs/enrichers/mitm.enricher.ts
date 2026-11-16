@@ -117,7 +117,13 @@ export function parseLlmnrFilterlog(
   if (f.length < 23) return {};
   if (f[8] !== '4') return {}; // IPv4 only
   if (f[15] !== '17') return {}; // UDP only
-  if (!LLMNR_PORTS.has(f[20]) && !LLMNR_PORTS.has(f[21])) return {};
+  // Responses ORIGINATE from the LLMNR/NBT-NS service port (5355/137) and
+  // target an ephemeral port. Requiring the source port to be the service
+  // port and the destination port not to be one excludes the reverse
+  // direction: unicast name QUERIES (ephemeral → 5355/137), whose sender
+  // is the querying client, not a poisoning responder.
+  if (!LLMNR_PORTS.has(f[20])) return {};
+  if (LLMNR_PORTS.has(f[21])) return {};
   const src = f[18];
   const dst = f[19];
   if (MULTICAST_RE.test(dst) || src === dst) return {}; // queries, not answers
