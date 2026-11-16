@@ -123,16 +123,26 @@ export class SuccessfulLoginAfterFailuresRule implements DetectionRule {
           users: [user],
           hosts,
         },
-        matching_events: events.slice(0, 50).map((e) => ({
-          collected_at: e.collected_at ?? new Date().toISOString(),
-          source_ip: e.source_ip,
-          hostname: e.hostname,
-          user_principal: e.user_principal,
-          action: e.action,
-          outcome: e.outcome,
-          source_type: undefined,
-          raw_message: undefined,
-        })),
+        // Evidence cap is 50 events, but the successful logins are the
+        // point of the detection — chronological truncation must not hide
+        // them behind a long failure burst (C012 chains on their times).
+        matching_events: [
+          ...events
+            .filter((e) => /success/i.test(e.outcome ?? ''))
+            .slice(0, 10),
+          ...events.slice(0, 50),
+        ]
+          .slice(0, 50)
+          .map((e) => ({
+            collected_at: e.collected_at ?? new Date().toISOString(),
+            source_ip: e.source_ip,
+            hostname: e.hostname,
+            user_principal: e.user_principal,
+            action: e.action,
+            outcome: e.outcome,
+            source_type: undefined,
+            raw_message: undefined,
+          })),
       });
     }
 

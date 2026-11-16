@@ -47,30 +47,42 @@ function overlap(a: string[], b: string[]): boolean {
   return a.some((x) => b.includes(x));
 }
 
+interface EventBounds {
+  first: number;
+  last: number;
+  /** Timestamps of events with outcome "success" (empty when none tagged). */
+  successTimes: number[];
+}
+
 /**
  * Earliest/latest event timestamps per incident, from the stored
  * incident_events. Incident `triggered_at` is cycle-granular (all Layer-1
  * rules detected in one cycle share the same second), so ordering between
- * same-cycle incidents must use the underlying event times.
+ * same-cycle incidents must use the underlying event times. Success times
+ * matter for login incidents whose evidence mixes failures and successes:
+ * the latest event may be a failure that says nothing about credential use.
  */
 async function loadEventBounds(
   prisma: PrismaService,
   ids: string[],
-): Promise<Map<string, { first: number; last: number }>> {
-  const map = new Map<string, { first: number; last: number }>();
+): Promise<Map<string, EventBounds>> {
+  const map = new Map<string, EventBounds>();
   if (ids.length === 0) return map;
   const events = await prisma.incidentEvent.findMany({
     where: { incident_id: { in: ids } },
-    select: { incident_id: true, collected_at: true },
+    select: { incident_id: true, collected_at: true, outcome: true },
   });
   for (const e of events) {
     const t = e.collected_at.getTime();
-    const cur = map.get(e.incident_id);
-    if (!cur) map.set(e.incident_id, { first: t, last: t });
-    else {
-      cur.first = Math.min(cur.first, t);
-      cur.last = Math.max(cur.last, t);
-    }
+    const cur = map.get(e.incident_id) ?? {
+      first: t,
+      last: t,
+      successTimes: [],
+    };
+    cur.first = Math.min(cur.first, t);
+    cur.last = Math.max(cur.last, t);
+    if (/success/i.test(e.outcome ?? '')) cur.successTimes.push(t);
+    map.set(e.incident_id, cur);
   }
   return map;
 }
@@ -732,7 +744,10 @@ export class AdAttackChainRule implements AttackCorrelationRule {
     // Pattern A — roasting followed by successful use of credentials.
     // Ordering uses the underlying event times, not incident triggered_at:
     // same-cycle incidents share a cycle timestamp and Layer-1 rules run in
-    // array order (R008 before R030), which would invert the chain.
+    // array order (R008 before R030), which would invert the chain. For the
+    // login incident the relevant time is its SUCCESS outcome — R008 stores
+    // failures and successes mixed, and a failure after the success says
+    // nothing about credential use.
     const bounds = await loadEventBounds(prisma, [
       ...roastings.map((i) => i.id),
       ...logins.map((i) => i.id),
@@ -741,19 +756,37 @@ export class AdAttackChainRule implements AttackCorrelationRule {
       bounds.get(i.id)?.first ?? i.triggered_at.getTime();
     const lastOf = (i: IncidentRow): number =>
       bounds.get(i.id)?.last ?? i.triggered_at.getTime();
+    // Earliest successful-login time within the chain window, or null.
+    // Falls back to the incident's latest event when the evidence carries
+    // no success outcome (older incidents, untagged sources).
+    const loginUseAfter = (
+      l: IncidentRow,
+      roastStart: number,
+    ): number | null => {
+      const times = bounds.get(l.id)?.successTimes;
+      if (!times || times.length === 0) {
+        const t = lastOf(l);
+        return t >= roastStart && t - roastStart <= AdAttackChainRule.WINDOW_MS
+          ? t
+          : null;
+      }
+      const t = times.find(
+        (x) => x >= roastStart && x - roastStart <= AdAttackChainRule.WINDOW_MS,
+      );
+      return t ?? null;
+    };
 
     for (const s1 of roastings) {
       if (fired.has(s1.id) || alreadyCorrelated(s1)) continue;
       const s1Ips = ipsOf(s1);
       if (s1Ips.length === 0) continue;
-      const s2 = logins
-        .filter(
-          (l) =>
-            overlap(ipsOf(l), s1Ips) &&
-            lastOf(l) >= lastOf(s1) &&
-            lastOf(l) - firstOf(s1) <= AdAttackChainRule.WINDOW_MS,
-        )
-        .sort((a, b) => lastOf(a) - lastOf(b))[0];
+      const roastStart = firstOf(s1);
+      const candidates = logins
+        .filter((l) => overlap(ipsOf(l), s1Ips))
+        .map((l) => ({ l, use: loginUseAfter(l, roastStart) }))
+        .filter((c): c is { l: IncidentRow; use: number } => c.use !== null)
+        .sort((a, b) => a.use - b.use);
+      const s2 = candidates[0]?.l;
       if (!s2) continue;
       fired.add(s1.id);
       results.push(build(s1, s2, 'roasting-then-login'));
