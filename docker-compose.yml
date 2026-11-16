@@ -122,6 +122,10 @@ services:
       PFSENSE_API_KEY: 0ee670fbb746a2de16bae58c3775d088
       PFSENSE_TIMEOUT: '10000'
       PFSENSE_REJECT_UNAUTHORIZED: 'false'
+      # MITM playbook allowlists (ARP spoofing / rogue DHCP / LLMNR poisoning)
+      ARP_PROTECTED_IPS: 192.168.189.2,192.168.189.10
+      DHCP_SERVERS_ALLOWED: 192.168.189.2
+      NAME_SERVERS_ALLOWED: 192.168.189.2,192.168.189.10
       # FortiGate SOAR agent (set SOAR_FIREWALL_PROVIDER=fortigate to use it)
       FORTIGATE_URL: https://192.168.37.136
       FORTIGATE_API_TOKEN: ''
