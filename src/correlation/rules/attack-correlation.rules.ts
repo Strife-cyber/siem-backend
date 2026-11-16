@@ -47,6 +47,34 @@ function overlap(a: string[], b: string[]): boolean {
   return a.some((x) => b.includes(x));
 }
 
+/**
+ * Earliest/latest event timestamps per incident, from the stored
+ * incident_events. Incident `triggered_at` is cycle-granular (all Layer-1
+ * rules detected in one cycle share the same second), so ordering between
+ * same-cycle incidents must use the underlying event times.
+ */
+async function loadEventBounds(
+  prisma: PrismaService,
+  ids: string[],
+): Promise<Map<string, { first: number; last: number }>> {
+  const map = new Map<string, { first: number; last: number }>();
+  if (ids.length === 0) return map;
+  const events = await prisma.incidentEvent.findMany({
+    where: { incident_id: { in: ids } },
+    select: { incident_id: true, collected_at: true },
+  });
+  for (const e of events) {
+    const t = e.collected_at.getTime();
+    const cur = map.get(e.incident_id);
+    if (!cur) map.set(e.incident_id, { first: t, last: t });
+    else {
+      cur.first = Math.min(cur.first, t);
+      cur.last = Math.max(cur.last, t);
+    }
+  }
+  return map;
+}
+
 function union(a: string[], b: string[]): string[] {
   return [...new Set([...a, ...b])];
 }
@@ -701,7 +729,19 @@ export class AdAttackChainRule implements AttackCorrelationRule {
       results.push(build(d, null, 'dcsync'));
     }
 
-    // Pattern A — roasting followed by successful use of credentials
+    // Pattern A — roasting followed by successful use of credentials.
+    // Ordering uses the underlying event times, not incident triggered_at:
+    // same-cycle incidents share a cycle timestamp and Layer-1 rules run in
+    // array order (R008 before R030), which would invert the chain.
+    const bounds = await loadEventBounds(prisma, [
+      ...roastings.map((i) => i.id),
+      ...logins.map((i) => i.id),
+    ]);
+    const firstOf = (i: IncidentRow): number =>
+      bounds.get(i.id)?.first ?? i.triggered_at.getTime();
+    const lastOf = (i: IncidentRow): number =>
+      bounds.get(i.id)?.last ?? i.triggered_at.getTime();
+
     for (const s1 of roastings) {
       if (fired.has(s1.id) || alreadyCorrelated(s1)) continue;
       const s1Ips = ipsOf(s1);
@@ -709,12 +749,11 @@ export class AdAttackChainRule implements AttackCorrelationRule {
       const s2 = logins
         .filter(
           (l) =>
-            l.triggered_at >= s1.triggered_at &&
-            l.triggered_at.getTime() - s1.triggered_at.getTime() <=
-              AdAttackChainRule.WINDOW_MS &&
-            overlap(ipsOf(l), s1Ips),
+            overlap(ipsOf(l), s1Ips) &&
+            lastOf(l) >= lastOf(s1) &&
+            lastOf(l) - firstOf(s1) <= AdAttackChainRule.WINDOW_MS,
         )
-        .sort((a, b) => a.triggered_at.getTime() - b.triggered_at.getTime())[0];
+        .sort((a, b) => lastOf(a) - lastOf(b))[0];
       if (!s2) continue;
       fired.add(s1.id);
       results.push(build(s1, s2, 'roasting-then-login'));
