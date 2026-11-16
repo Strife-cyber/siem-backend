@@ -159,21 +159,13 @@ export class LlmnrPoisoningRule implements DetectionRule {
           `${new Set(matched.map((e) => e.destination_ip)).size} distinct hosts ` +
           `in 10min (${ntlm.length} NTLM logon event(s) corroborate)`,
         related_entities: {
-          ips: [
-            ...new Set(
-              [responder, ...matched.map((e) => e.destination_ip)].filter(
-                (x): x is string => !!x,
-              ),
-            ),
-          ],
+          // SAFETY: block_ip blocks every listed IP — only the responder
+          // may be listed, never the victim workstations it answered.
+          ips: [responder],
           users: [
             ...new Set(ntlm.map((e) => e.user_principal).filter(Boolean)),
           ] as string[],
-          hosts: [
-            ...new Set(
-              [...matched, ...ntlm].map((e) => e.hostname).filter(Boolean),
-            ),
-          ] as string[],
+          hosts: [],
         },
         matching_events: matching.map(toPayload),
       });

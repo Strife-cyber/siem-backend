@@ -113,9 +113,9 @@ export class RogueDhcpRule implements DetectionRule {
             ),
           ],
           users: [],
-          hosts: [
-            ...new Set(rogue.map((e) => e.hostname).filter(Boolean)),
-          ] as string[],
+          // The reporting hostname is the DHCP client (victim), not the
+          // rogue server — isolate_endpoint prefers hosts, so leave empty.
+          hosts: [],
         },
         matching_events: events,
       },
