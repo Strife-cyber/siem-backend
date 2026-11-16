@@ -307,6 +307,14 @@ interface SequenceStageConfig {
   confidence: number;
   summary: (chain: IncidentRow[]) => string;
   response?: { playbook: string; mode: 'AUTO' | 'CONFIRM' };
+  /** Multiple SOAR responses (takes precedence over `response`). */
+  responses?: Array<{ playbook: string; mode: 'AUTO' | 'CONFIRM' }>;
+  /**
+   * Drop chain hostnames from related_entities. Needed when a stage carries
+   * infrastructure hostnames (e.g. the DC in R008): isolate_endpoint prefers
+   * hosts over IPs and must never aim at them (MITM/AD playbook rule).
+   */
+  dropHosts?: boolean;
 }
 
 function shareEntity(a: IncidentRow, b: IncidentRow): boolean {
@@ -404,10 +412,12 @@ export function sequenceCorrelation(
           related_entities: {
             ips: chainIps,
             users: chainUsers,
-            hosts: chainHosts,
+            hosts: cfg.dropHosts ? [] : chainHosts,
           },
           prerequisite_incident_ids: chain.map((c) => c.id),
-          response: cfg.response,
+          ...(cfg.responses
+            ? { responses: cfg.responses }
+            : { response: cfg.response }),
         });
       }
       return results;
@@ -811,4 +821,31 @@ export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   DefenseEvasionToExfilRule,
   ReconToDataTransferRule,
   new AdAttackChainRule(),
+  /**
+   * C011 — MITM to account compromise (ARNO_SIEM MITM playbook):
+   * (R026 ARP spoofing | R027 rogue DHCP | R028 LLMNR/NBT-NS poisoning)
+   * followed by R008 (successful login after failures — the intercepted
+   * or relayed victim credentials being used) from the same attacker IP
+   * within 30 minutes → CRITICAL.
+   *
+   * isolate_endpoint + disable_account, both CONFIRM. dropHosts: R008
+   * carries the victim machine/DC hostname and isolate_endpoint prefers
+   * hosts — containment must aim at the attacker IP, never infrastructure.
+   */
+  sequenceCorrelation({
+    id: 'C011',
+    name: 'MITM to Account Compromise',
+    stages: [['R026', 'R027', 'R028'], ['R008']],
+    severity: 'CRITICAL',
+    confidence: 90,
+    summary: (chain) =>
+      `MITM precursor (${chain[0].rule_id ?? '?'}) followed by successful ` +
+      'login after failures from the same entity within 30min — possible ' +
+      'intercepted-credential use',
+    responses: [
+      { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+      { playbook: 'disable_account', mode: 'CONFIRM' },
+    ],
+    dropHosts: true,
+  }),
 ];
