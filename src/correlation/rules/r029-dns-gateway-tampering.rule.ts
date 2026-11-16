@@ -98,7 +98,7 @@ export class DnsGatewayTamperingRule implements DetectionRule {
                   { term: { source_type: 'linux_auditd' } },
                   { term: { action: 'file_access' } },
                 ],
-                must: [{ term: { 'file_path.keyword': '/etc/resolv.conf' } }],
+                must: [{ term: { file_path: '/etc/resolv.conf' } }],
               },
             },
             {
@@ -151,6 +151,9 @@ export class DnsGatewayTamperingRule implements DetectionRule {
     if (indicators.length === 0) return [];
 
     // Escalation: ARP spoofing evidence on the same host in the window.
+    // Only strong (non-nginx) indicators escalate — nginx access logs carry
+    // no scheme/port, so a /login match may be an ordinary HTTPS login and
+    // must stay WARNING on its own.
     const hostnames = [
       ...new Set(indicators.map((e) => e.hostname).filter(Boolean)),
     ] as string[];
@@ -169,7 +172,10 @@ export class DnsGatewayTamperingRule implements DetectionRule {
         ],
         1,
       );
-      arpEvidence = arp.length > 0;
+      const strong = indicators.some(
+        (e) => e.source_type !== 'nginx_access' && e.source_type !== 'nginx',
+      );
+      arpEvidence = strong && arp.length > 0;
     }
 
     const severity = arpEvidence ? 'HIGH' : 'WARNING';
