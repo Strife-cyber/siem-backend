@@ -658,6 +658,24 @@ const RULES = [
     confidence_weight: 88,
     is_active: false,
   },
+  {
+    id: 'C012',
+    name: 'AD Kerberos Attack Chain',
+    tactic: 'TA0006',
+    technique: 'T1558+T1003',
+    definition: {
+      layer: 2,
+      prerequisite_rules: ['R030', 'R031', 'R032', 'R008'],
+      time_window_seconds: 86400,
+      stages: [['R030', 'R031'], ['R008']],
+      response: {
+        playbook: 'isolate_endpoint+disable_account',
+        mode: 'CONFIRM',
+      },
+    },
+    confidence_weight: 92,
+    is_active: false,
+  },
 ];
 
 async function main() {

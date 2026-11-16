@@ -14,6 +14,8 @@ export interface AttackCorrelationResult {
   /** Layer-1/2 incidents that form the attack sequence evidence */
   prerequisite_incident_ids: string[];
   response?: { playbook: string; mode: 'AUTO' | 'CONFIRM' };
+  /** Multiple playbooks to trigger (e.g. isolate + disable account). */
+  responses?: Array<{ playbook: string; mode: 'AUTO' | 'CONFIRM' }>;
 }
 
 /**

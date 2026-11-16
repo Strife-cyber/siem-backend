@@ -47,6 +47,46 @@ function overlap(a: string[], b: string[]): boolean {
   return a.some((x) => b.includes(x));
 }
 
+interface EventBounds {
+  first: number;
+  last: number;
+  /** Timestamps of events with outcome "success" (empty when none tagged). */
+  successTimes: number[];
+}
+
+/**
+ * Earliest/latest event timestamps per incident, from the stored
+ * incident_events. Incident `triggered_at` is cycle-granular (all Layer-1
+ * rules detected in one cycle share the same second), so ordering between
+ * same-cycle incidents must use the underlying event times. Success times
+ * matter for login incidents whose evidence mixes failures and successes:
+ * the latest event may be a failure that says nothing about credential use.
+ */
+async function loadEventBounds(
+  prisma: PrismaService,
+  ids: string[],
+): Promise<Map<string, EventBounds>> {
+  const map = new Map<string, EventBounds>();
+  if (ids.length === 0) return map;
+  const events = await prisma.incidentEvent.findMany({
+    where: { incident_id: { in: ids } },
+    select: { incident_id: true, collected_at: true, outcome: true },
+  });
+  for (const e of events) {
+    const t = e.collected_at.getTime();
+    const cur = map.get(e.incident_id) ?? {
+      first: t,
+      last: t,
+      successTimes: [],
+    };
+    cur.first = Math.min(cur.first, t);
+    cur.last = Math.max(cur.last, t);
+    if (/success/i.test(e.outcome ?? '')) cur.successTimes.push(t);
+    map.set(e.incident_id, cur);
+  }
+  return map;
+}
+
 function union(a: string[], b: string[]): string[] {
   return [...new Set([...a, ...b])];
 }
@@ -612,6 +652,153 @@ const ReconToDataTransferRule = bridgedSequenceCorrelation({
   response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
 });
 
+/**
+ * C012 — AD Kerberos attack chain (ARNO_SIEM AD playbook)
+ *
+ * Pattern A: R030 (Kerberoasting) or R031 (AS-REP Roasting) followed within
+ * 24 h by R008 (successful login after failures) from the same attacker IP —
+ * the cracked credentials being used. Pattern B: an R032 (DCSync) incident
+ * alone, which already proves domain-wide credential access.
+ *
+ * Both escalate to CRITICAL with two CONFIRM responses: isolate_endpoint
+ * (attacker IP) and disable_account (compromised accounts). One C012 incident
+ * per stage-1 incident (deduped against existing C012 incidents across cycles,
+ * since the 24 h window far exceeds the generic 5-minute duplicate window).
+ *
+ * related_entities.hosts is deliberately EMPTY: the AD events are logged on
+ * the DC, so R008 carries the DC hostname — unioning hosts would aim
+ * isolate_endpoint at the domain controller. Containment targets the
+ * attacker IP only (the playbook's "never isolate the DC" rule).
+ */
+export class AdAttackChainRule implements AttackCorrelationRule {
+  readonly id = 'C012';
+  readonly name = 'AD Kerberos Attack Chain';
+  private static readonly WINDOW_MS = 24 * 60 * 60 * 1000;
+  private static readonly LOOKBACK_MS = 25 * 60 * 60 * 1000;
+
+  async detect(
+    prisma: PrismaService,
+    _since: Date,
+  ): Promise<AttackCorrelationResult[]> {
+    const lookback = new Date(Date.now() - AdAttackChainRule.LOOKBACK_MS);
+    const incidents = await loadIncidents(prisma, lookback, [
+      'R030',
+      'R031',
+      'R032',
+      'R008',
+    ]);
+    const existing = await loadIncidents(prisma, lookback, ['C012']);
+
+    const roastings = incidents.filter(
+      (i) => i.rule_id === 'R030' || i.rule_id === 'R031',
+    );
+    const dcsyncs = incidents.filter((i) => i.rule_id === 'R032');
+    const logins = incidents.filter((i) => i.rule_id === 'R008');
+
+    const alreadyCorrelated = (s1: IncidentRow): boolean =>
+      existing.some(
+        (c) =>
+          c.triggered_at >= s1.triggered_at &&
+          (overlap(ipsOf(c), ipsOf(s1)) || overlap(usersOf(c), usersOf(s1))),
+      );
+
+    const results: AttackCorrelationResult[] = [];
+    const fired = new Set<string>();
+
+    const build = (
+      s1: IncidentRow,
+      s2: IncidentRow | null,
+      pattern: 'roasting-then-login' | 'dcsync',
+    ): AttackCorrelationResult => ({
+      rule_id: this.id,
+      rule_name: this.name,
+      severity: 'CRITICAL',
+      confidence_score: 92,
+      summary:
+        pattern === 'dcsync'
+          ? `AD domain compromise: DCSync (${s1.rule_id}) — directory ` +
+            `replication rights abused; isolate attacker and disable ` +
+            `compromised accounts`
+          : `AD attack chain: ${s1.rule_id} followed by successful login ` +
+            `(${s2?.rule_id}) from the same attacker IP within 24 hours — ` +
+            `cracked credentials in use; isolate attacker and disable accounts`,
+      related_entities: {
+        ips: union(ipsOf(s1), s2 ? ipsOf(s2) : []),
+        users: union(usersOf(s1), s2 ? usersOf(s2) : []),
+        hosts: [],
+      },
+      prerequisite_incident_ids: s2 ? [s1.id, s2.id] : [s1.id],
+      responses: [
+        { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+        { playbook: 'disable_account', mode: 'CONFIRM' },
+      ],
+    });
+
+    // Pattern B — DCSync alone proves domain compromise
+    for (const d of dcsyncs) {
+      if (fired.has(d.id) || alreadyCorrelated(d)) continue;
+      fired.add(d.id);
+      results.push(build(d, null, 'dcsync'));
+    }
+
+    // Pattern A — roasting followed by successful use of credentials.
+    // Ordering uses the underlying event times, not incident triggered_at:
+    // same-cycle incidents share a cycle timestamp and Layer-1 rules run in
+    // array order (R008 before R030), which would invert the chain. For the
+    // login incident the relevant time is its SUCCESS outcome — R008 stores
+    // failures and successes mixed, and a failure after the success says
+    // nothing about credential use.
+    const bounds = await loadEventBounds(prisma, [
+      ...roastings.map((i) => i.id),
+      ...logins.map((i) => i.id),
+    ]);
+    const firstOf = (i: IncidentRow): number =>
+      bounds.get(i.id)?.first ?? i.triggered_at.getTime();
+    const lastOf = (i: IncidentRow): number =>
+      bounds.get(i.id)?.last ?? i.triggered_at.getTime();
+    // Earliest successful-login time after the roasting completed and
+    // within the chain window, or null. The lower bound is the roasting's
+    // LAST event: a login between the first and last ticket request is not
+    // "roasting followed by credential use". Falls back to the incident's
+    // latest event when the evidence carries no success outcome (older
+    // incidents, untagged sources).
+    const loginUseAfter = (
+      l: IncidentRow,
+      roastStart: number,
+      roastEnd: number,
+    ): number | null => {
+      const inWindow = (x: number) =>
+        x >= roastEnd && x - roastStart <= AdAttackChainRule.WINDOW_MS;
+      const times = bounds.get(l.id)?.successTimes;
+      if (!times || times.length === 0) {
+        const t = lastOf(l);
+        return inWindow(t) ? t : null;
+      }
+      const matches = times.filter(inWindow);
+      return matches.length ? Math.min(...matches) : null;
+    };
+
+    for (const s1 of roastings) {
+      if (fired.has(s1.id) || alreadyCorrelated(s1)) continue;
+      const s1Ips = ipsOf(s1);
+      if (s1Ips.length === 0) continue;
+      const roastStart = firstOf(s1);
+      const roastEnd = lastOf(s1);
+      const candidates = logins
+        .filter((l) => overlap(ipsOf(l), s1Ips))
+        .map((l) => ({ l, use: loginUseAfter(l, roastStart, roastEnd) }))
+        .filter((c): c is { l: IncidentRow; use: number } => c.use !== null)
+        .sort((a, b) => a.use - b.use);
+      const s2 = candidates[0]?.l;
+      if (!s2) continue;
+      fired.add(s1.id);
+      results.push(build(s1, s2, 'roasting-then-login'));
+    }
+
+    return results;
+  }
+}
+
 export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   new ReconToAccessRule(),
   new BruteForceToCompromiseRule(),
@@ -623,4 +810,5 @@ export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   StagingToExfiltrationRule,
   DefenseEvasionToExfilRule,
   ReconToDataTransferRule,
+  new AdAttackChainRule(),
 ];
