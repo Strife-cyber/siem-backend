@@ -62,6 +62,33 @@ interface EventBounds {
  * matter for login incidents whose evidence mixes failures and successes:
  * the latest event may be a failure that says nothing about credential use.
  */
+/**
+ * ES event ids backing each incident (from incident_event rows). Used by
+ * C012 to dedup per ATTACK: an existing C012 incident carries its
+ * prerequisite incidents' events as evidence, so a stage-1 incident that
+ * shares any evidence id with it is the same attack — even when the
+ * incidents expose no IP/user entities at all (e.g. DCSync without a
+ * resolved source IP).
+ */
+async function loadEvidenceIds(
+  prisma: PrismaService,
+  incidentIds: string[],
+): Promise<Map<string, Set<string>>> {
+  const map = new Map<string, Set<string>>();
+  if (incidentIds.length === 0) return map;
+  const rows = await prisma.incidentEvent.findMany({
+    where: { incident_id: { in: incidentIds }, es_id: { not: null } },
+    select: { incident_id: true, es_id: true },
+  });
+  for (const r of rows) {
+    if (!r.es_id) continue;
+    const set = map.get(r.incident_id) ?? new Set<string>();
+    set.add(r.es_id);
+    map.set(r.incident_id, set);
+  }
+  return map;
+}
+
 async function loadEventBounds(
   prisma: PrismaService,
   ids: string[],
@@ -706,16 +733,31 @@ export class AdAttackChainRule implements AttackCorrelationRule {
     const logins = incidents.filter((i) => i.rule_id === 'R008');
 
     // Dedup per ATTACK, not per user: an existing C012 suppresses a stage-1
-    // incident only when it shares the ATTACKER IP, and — for roasting
-    // chains — a victim account too. The old OR-matching let one attack
-    // suppress an unrelated second attacker IP roasting the same account,
-    // leaving the new attacker IP without containment.
+    // incident only when it covers the SAME underlying evidence events
+    // (the prerequisite incidents' events are copied into the C012
+    // incident's events). Entity matching is only a fallback for legacy
+    // incidents without evidence links — empty-entity incidents (e.g. a
+    // DCSync with no resolved source IP) must still dedup, or every
+    // cycle re-fires a CRITICAL and re-queues containment.
+    const evidence = await loadEvidenceIds(prisma, [
+      ...existing.map((c) => c.id),
+      ...roastings.map((i) => i.id),
+      ...dcsyncs.map((i) => i.id),
+    ]);
+    const shareEvidence = (a: string, b: string): boolean => {
+      const ea = evidence.get(a);
+      const eb = evidence.get(b);
+      if (!ea || !eb) return false;
+      for (const x of ea) if (eb.has(x)) return true;
+      return false;
+    };
     const alreadyCorrelated = (
       s1: IncidentRow,
       pattern: 'roasting-then-login' | 'dcsync',
     ): boolean =>
       existing.some((c) => {
         if (c.triggered_at < s1.triggered_at) return false;
+        if (shareEvidence(s1.id, c.id)) return true;
         if (!overlap(ipsOf(c), ipsOf(s1))) return false;
         if (pattern === 'dcsync') return true;
         return usersOf(s1).length === 0 || overlap(usersOf(c), usersOf(s1));
