@@ -32,8 +32,12 @@ function envSet(name: string): Set<string> {
 
 async function fetchArpEvents(
   es: ElasticsearchService,
-  since: Date,
+  _since: Date,
 ): Promise<Hit[]> {
+  // Fixed 15-minute lookback: oscillation spans correlation cycles, and
+  // `since` advances every run — a cycle-scoped window would never
+  // accumulate the 3 changes the 5-minute oscillation check needs.
+  const lookback = new Date(Date.now() - 15 * 60 * 1000);
   const result = await es.getClient().search({
     index: 'ctu-logs',
     size: 2000,
@@ -49,7 +53,7 @@ async function fetchArpEvents(
           {
             range: {
               normalized_at: {
-                gte: since.toISOString(),
+                gte: lookback.toISOString(),
                 lte: new Date().toISOString(),
               },
             },
@@ -190,9 +194,9 @@ export class ArpSpoofingRule implements DetectionRule {
         users: [
           ...new Set(evs.map((e) => e.user_principal).filter(Boolean)),
         ] as string[],
-        hosts: [
-          ...new Set(evs.map((e) => e.hostname).filter(Boolean)),
-        ] as string[],
+        // isolate_endpoint prefers hosts over IPs — the reporting host is
+        // the firewall/arpwatch box, never the attacker. Leave empty.
+        hosts: [],
       },
       matching_events: evs.slice(0, 50).map(toPayload),
     });
