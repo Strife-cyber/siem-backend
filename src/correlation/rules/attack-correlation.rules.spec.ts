@@ -208,10 +208,7 @@ describe('AdAttackChainRule (C012)', () => {
       { incident_id: 'r008', collected_at: new Date(base + 60_000) },
       { incident_id: 'r008', collected_at: new Date(base + 120_000) },
     ];
-    const results = await rule.detect(
-      fakePrisma(incidents, events),
-      since,
-    );
+    const results = await rule.detect(fakePrisma(incidents, events), since);
     expect(results).toHaveLength(1);
     expect(results[0].prerequisite_incident_ids).toEqual(['r030', 'r008']);
   });
