@@ -756,24 +756,26 @@ export class AdAttackChainRule implements AttackCorrelationRule {
       bounds.get(i.id)?.first ?? i.triggered_at.getTime();
     const lastOf = (i: IncidentRow): number =>
       bounds.get(i.id)?.last ?? i.triggered_at.getTime();
-    // Earliest successful-login time within the chain window, or null.
-    // Falls back to the incident's latest event when the evidence carries
-    // no success outcome (older incidents, untagged sources).
+    // Earliest successful-login time after the roasting completed and
+    // within the chain window, or null. The lower bound is the roasting's
+    // LAST event: a login between the first and last ticket request is not
+    // "roasting followed by credential use". Falls back to the incident's
+    // latest event when the evidence carries no success outcome (older
+    // incidents, untagged sources).
     const loginUseAfter = (
       l: IncidentRow,
       roastStart: number,
+      roastEnd: number,
     ): number | null => {
+      const inWindow = (x: number) =>
+        x >= roastEnd && x - roastStart <= AdAttackChainRule.WINDOW_MS;
       const times = bounds.get(l.id)?.successTimes;
       if (!times || times.length === 0) {
         const t = lastOf(l);
-        return t >= roastStart && t - roastStart <= AdAttackChainRule.WINDOW_MS
-          ? t
-          : null;
+        return inWindow(t) ? t : null;
       }
-      const t = times.find(
-        (x) => x >= roastStart && x - roastStart <= AdAttackChainRule.WINDOW_MS,
-      );
-      return t ?? null;
+      const matches = times.filter(inWindow);
+      return matches.length ? Math.min(...matches) : null;
     };
 
     for (const s1 of roastings) {
@@ -781,9 +783,10 @@ export class AdAttackChainRule implements AttackCorrelationRule {
       const s1Ips = ipsOf(s1);
       if (s1Ips.length === 0) continue;
       const roastStart = firstOf(s1);
+      const roastEnd = lastOf(s1);
       const candidates = logins
         .filter((l) => overlap(ipsOf(l), s1Ips))
-        .map((l) => ({ l, use: loginUseAfter(l, roastStart) }))
+        .map((l) => ({ l, use: loginUseAfter(l, roastStart, roastEnd) }))
         .filter((c): c is { l: IncidentRow; use: number } => c.use !== null)
         .sort((a, b) => a.use - b.use);
       const s2 = candidates[0]?.l;

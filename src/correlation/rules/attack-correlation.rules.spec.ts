@@ -295,6 +295,81 @@ describe('AdAttackChainRule (C012)', () => {
     expect(results).toHaveLength(0);
   });
 
+  it('does not chain a login that succeeds before the roasting completes', async () => {
+    // Ticket requests span +0s..+60s; the login success at +30s is between
+    // them — not "roasting followed by credential use".
+    const incidents = [
+      incident('r008', 'R008', 9, {
+        ips: ['192.168.189.50'],
+        users: ['svc_sql'],
+        hosts: ['srv-dc-01'],
+      }),
+      incident('r030', 'R030', 10, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+    ];
+    const base = Date.UTC(2026, 10, 16, 10, 0, 0);
+    const events = [
+      { incident_id: 'r030', collected_at: new Date(base + 0) },
+      { incident_id: 'r030', collected_at: new Date(base + 60_000) },
+      {
+        incident_id: 'r008',
+        collected_at: new Date(base + 30_000),
+        outcome: 'success',
+      },
+    ];
+    const results = await rule.detect(fakePrisma(incidents, events), since);
+    expect(results).toHaveLength(0);
+  });
+
+  it('picks the earliest in-window success across unordered incident events', async () => {
+    // r008a carries two successes out of chronological order; the chain
+    // must use the earliest (+100s), which beats r008b's +200s.
+    const incidents = [
+      incident('r030', 'R030', 10, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+      incident('r008a', 'R008', 11, {
+        ips: ['192.168.189.50'],
+        users: ['svc_a'],
+        hosts: ['srv-dc-01'],
+      }),
+      incident('r008b', 'R008', 12, {
+        ips: ['192.168.189.50'],
+        users: ['svc_b'],
+        hosts: ['srv-dc-01'],
+      }),
+    ];
+    const base = Date.UTC(2026, 10, 16, 10, 0, 0);
+    const events = [
+      { incident_id: 'r030', collected_at: new Date(base + 0) },
+      { incident_id: 'r030', collected_at: new Date(base + 12_000) },
+      // Deliberately out of order: +300s arrives before +100s.
+      {
+        incident_id: 'r008a',
+        collected_at: new Date(base + 300_000),
+        outcome: 'success',
+      },
+      {
+        incident_id: 'r008a',
+        collected_at: new Date(base + 100_000),
+        outcome: 'success',
+      },
+      {
+        incident_id: 'r008b',
+        collected_at: new Date(base + 200_000),
+        outcome: 'success',
+      },
+    ];
+    const results = await rule.detect(fakePrisma(incidents, events), since);
+    expect(results).toHaveLength(1);
+    expect(results[0].prerequisite_incident_ids).toEqual(['r030', 'r008a']);
+  });
+
   it('pattern B: DCSync alone escalates to C012', async () => {
     const incidents = [
       incident('r032', 'R032', 0, {
