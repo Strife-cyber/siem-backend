@@ -188,10 +188,7 @@ describe('DcsyncRule (R032)', () => {
       hostname: 'srv-dc-02',
       source_ip: '192.168.189.99',
     });
-    const results = await rule.detect(
-      fakeEs([dcsync4662, otherDc4624]),
-      since,
-    );
+    const results = await rule.detect(fakeEs([dcsync4662, otherDc4624]), since);
     expect(results).toHaveLength(1);
     expect(results[0].severity).toBe('CRITICAL');
     expect(results[0].related_entities?.ips).toEqual([]);

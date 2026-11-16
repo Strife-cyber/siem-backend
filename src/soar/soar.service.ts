@@ -155,9 +155,7 @@ export class SoarService {
     if (payload.success === false) return true;
 
     const failed = Array.isArray(payload.failed) ? payload.failed.length : 0;
-    const skipped = Array.isArray(payload.skipped)
-      ? payload.skipped.length
-      : 0;
+    const skipped = Array.isArray(payload.skipped) ? payload.skipped.length : 0;
     if (failed === 0 && skipped === 0) return false;
 
     const anySucceeded = ['blocked', 'isolated'].some((key) => {

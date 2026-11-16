@@ -105,8 +105,7 @@ export async function resolveLogonSourceIp(
   );
   const match = hostname
     ? hits.find(
-        (h) =>
-          (h.hostname ?? '').toLowerCase() === hostname.toLowerCase(),
+        (h) => (h.hostname ?? '').toLowerCase() === hostname.toLowerCase(),
       )
     : hits[0];
   const ip = match?.source_ip;
