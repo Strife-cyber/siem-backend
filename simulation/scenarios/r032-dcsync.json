@@ -1,8 +1,10 @@
 {
   "name": "r032-dcsync",
-  "description": "R032: DCSync (T1003.006) — non-DC account exercises directory-replication rights (4662 with replication GUID) after a network logon (4624) from the attacker IP; must create an R032 CRITICAL incident and queue isolate_endpoint for analyst approval (CONFIRM).",
+  "description": "R032: DCSync (T1003.006) \u2014 non-DC account exercises directory-replication rights (4662 with replication GUID) after a network logon (4624) from the attacker IP; must create an R032 CRITICAL incident and queue isolate_endpoint for analyst approval (CONFIRM).",
   "base_time": "2026-11-16T12:00:00Z",
-  "requires_rules": ["R032"],
+  "requires_rules": [
+    "R032"
+  ],
   "sources": [
     {
       "source_type": "WINDOWS_SECURITY",
@@ -21,16 +23,28 @@
   ],
   "assert": {
     "expect_incidents": [
-      { "rule_id": "R032", "min_severity": "CRITICAL", "min_count": 1 }
+      {
+        "rule_id": "R032",
+        "min_severity": "CRITICAL",
+        "min_count": 1
+      }
     ],
     "expect_no_incidents_for_rules": [],
     "expect_no_high_or_critical_incidents": false,
     "expect_playbook_executions": [
-      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 }
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      }
     ],
     "expect_soar_actions": [],
     "expect_entity_risk": [
-      { "entity_type": "IP", "entity_value": "192.168.189.50", "min_score": 20 }
+      {
+        "entity_type": "IP",
+        "min_score": 20,
+        "value": "192.168.189.50"
+      }
     ]
   }
 }

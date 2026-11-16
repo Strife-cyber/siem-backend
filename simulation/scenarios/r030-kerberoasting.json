@@ -1,8 +1,10 @@
 {
   "name": "r030-kerberoasting",
-  "description": "R030: Kerberoasting (T1558.003) — 3 distinct RC4-encrypted Kerberos service ticket requests (4769) from the attacker IP against service accounts; must create an R030 HIGH incident and queue isolate_endpoint for analyst approval (CONFIRM).",
+  "description": "R030: Kerberoasting (T1558.003) \u2014 3 distinct RC4-encrypted Kerberos service ticket requests (4769) from the attacker IP against service accounts; must create an R030 HIGH incident and queue isolate_endpoint for analyst approval (CONFIRM).",
   "base_time": "2026-11-16T10:00:00Z",
-  "requires_rules": ["R030"],
+  "requires_rules": [
+    "R030"
+  ],
   "sources": [
     {
       "source_type": "WINDOWS_SECURITY",
@@ -25,16 +27,28 @@
   ],
   "assert": {
     "expect_incidents": [
-      { "rule_id": "R030", "min_severity": "HIGH", "min_count": 1 }
+      {
+        "rule_id": "R030",
+        "min_severity": "HIGH",
+        "min_count": 1
+      }
     ],
     "expect_no_incidents_for_rules": [],
     "expect_no_high_or_critical_incidents": false,
     "expect_playbook_executions": [
-      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 }
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      }
     ],
     "expect_soar_actions": [],
     "expect_entity_risk": [
-      { "entity_type": "IP", "entity_value": "192.168.189.50", "min_score": 20 }
+      {
+        "entity_type": "IP",
+        "min_score": 20,
+        "value": "192.168.189.50"
+      }
     ]
   }
 }

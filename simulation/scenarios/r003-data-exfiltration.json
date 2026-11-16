@@ -1,6 +1,9 @@
 {
   "name": "r003-data-exfiltration",
   "description": "R003: high-volume outbound flow (T1041) \u2014 collector filterlog flow aggregation emits FLOW_BYTES summary above 10MB",
+  "requires_rules": [
+    "R003"
+  ],
   "repeat": 1,
   "sources": [
     {

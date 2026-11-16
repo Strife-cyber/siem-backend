@@ -1,6 +1,9 @@
 {
   "name": "r019-firewall-modification",
   "description": "R019: Windows Firewall rule changes (T1562.004) \u2014 unauthorized firewall rules changed or disabled (alert CONFIRM)",
+  "requires_rules": [
+    "R019"
+  ],
   "repeat": 1,
   "sources": [
     {
@@ -42,8 +45,8 @@
     "expect_entity_risk": [
       {
         "entity_type": "HOST",
-        "entity_value": "win-dc-09",
-        "min_score": 10
+        "min_score": 10,
+        "value": "win-dc-09"
       }
     ]
   }
