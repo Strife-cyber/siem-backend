@@ -359,6 +359,7 @@ function findChain(
   cfg: SequenceStageConfig,
   sorted: IncidentRow[],
   share: ShareEntityPredicate,
+  bounds?: Map<string, EventBounds>,
 ): IncidentRow[] | null {
   const chain: IncidentRow[] = [start];
   const used = new Set<string>([start.id]);
@@ -368,11 +369,17 @@ function findChain(
     for (const i of sorted) {
       if (used.has(i.id)) continue;
       if (!cfg.stages[stage].includes(i.rule_id ?? '')) continue;
-      if (
-        cfg.ordered &&
-        i.triggered_at.getTime() < cursor.triggered_at.getTime()
-      )
-        continue;
+      if (cfg.ordered) {
+        // Stage order follows the underlying EVENT times, not triggered_at:
+        // incidents created in one cycle are timestamped in rule-execution
+        // order (R008 runs before R026-R028), which would invert same-cycle
+        // chains. Fall back to triggered_at when an incident has no events.
+        const cur = bounds?.get(cursor.id);
+        const cand = bounds?.get(i.id);
+        const cursorT = cur?.last ?? cursor.triggered_at.getTime();
+        const candT = cand?.first ?? i.triggered_at.getTime();
+        if (candT < cursorT) continue;
+      }
       if (
         Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
         WINDOW_MS
@@ -423,10 +430,14 @@ export function sequenceCorrelation(
         }
       }
       const share = cfg.share ?? shareEntity;
+      // Event-time bounds for ordered rules (see findChain).
+      const bounds = cfg.ordered
+        ? await loadEventBounds(prisma, incidents.map((i) => i.id))
+        : undefined;
 
       for (const start of sorted) {
         if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
-        const chain = findChain(start, cfg, sorted, share);
+        const chain = findChain(start, cfg, sorted, share, bounds);
         if (!chain) continue;
 
         const key = chain.map((c) => c.id).join('|');
