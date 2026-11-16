@@ -150,7 +150,12 @@ export class ArpSpoofingRule implements DetectionRule {
       const usurped = (e.arp_usurped_ip ?? '').toLowerCase();
       if (e.action === 'arp_ip_conflict') {
         critical.push(e);
-      } else if (protectedIps.has(usurped) || oscillating.has(usurped)) {
+      } else if (protectedIps.has(usurped)) {
+        // Playbook: an ARP table change on a PROTECTED IP (gateway/DC) is
+        // CRITICAL — it is the highest-value spoofing target. Ordinary
+        // oscillation on unprotected IPs stays HIGH.
+        critical.push(e);
+      } else if (oscillating.has(usurped)) {
         high.push(e);
       }
       // else: single MAC change on an unprotected IP — known FP, skip.

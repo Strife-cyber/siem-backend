@@ -10,6 +10,13 @@ export interface AttackCorrelationResult {
     ips?: string[];
     users?: string[];
     hosts?: string[];
+    /**
+     * Stable dedup key for the exact chain/attack (e.g. joined prerequisite
+     * incident ids). Correlation rules use it to suppress re-firing the
+     * same chain on later cycles; it is not an entity and is ignored by
+     * entity-graph consumers.
+     */
+    dedup_key?: string;
   };
   /** Layer-1/2 incidents that form the attack sequence evidence */
   prerequisite_incident_ids: string[];
