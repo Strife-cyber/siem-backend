@@ -108,7 +108,7 @@ export class KerberoastingRule implements DetectionRule {
         rule_id: this.id,
         rule_name: this.name,
         severity,
-        confidence_score: severity === 'CRITICAL' ? 0.95 : 0.85,
+        confidence_score: severity === 'CRITICAL' ? 95 : 85,
         summary: `Kerberoasting indicator from ${ip} (${user}): ${reason}. Targeted services: ${targeted.join(', ')}`,
         related_entities: { ips: [ip], users: [user], hosts: [] },
         matching_events: group.slice(0, 50),

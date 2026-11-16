@@ -62,7 +62,7 @@ export class DcsyncRule implements DetectionRule {
         rule_id: this.id,
         rule_name: this.name,
         severity: 'CRITICAL',
-        confidence_score: ip ? 0.95 : 0.85,
+        confidence_score: ip ? 95 : 85,
         summary: ip
           ? `DCSync attempt: ${subject} exercised directory-replication rights from ${ip}`
           : `DCSync attempt by ${subject} — source IP unresolved (no matching 4624 logon in 24h); manual containment required`,
