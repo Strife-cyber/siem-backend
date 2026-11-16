@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { IFirewallAgent } from '../agents/firewall-agent.interface';
+import { isProtectedIp } from '../agents/ip-validation.util';
 
 export async function isolateHostPlaybook(
   agent: IFirewallAgent,
@@ -11,6 +12,12 @@ export async function isolateHostPlaybook(
   const failed: string[] = [];
 
   for (const host of hosts) {
+    // Never isolate infrastructure IPs (SIEM, AD DC, gateway). Hostnames
+    // are not IPs and are never matched here.
+    if (isProtectedIp(host)) {
+      logger.warn(`[isolate_host] Skipping protected IP ${host}`);
+      continue;
+    }
     try {
       const result = await agent.isolateHost(host, reason);
       if (result.success) {

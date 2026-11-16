@@ -34,6 +34,9 @@ import { SshPersistenceRule } from './rules/r016-ssh-persistence.rule';
 import { DnsTunnelingRule } from './rules/r024-dns-tunneling.rule';
 import { DataStagingRule } from './rules/r025-data-staging.rule';
 import { FirewallModificationRule } from './rules/r019-firewall-modification.rule';
+import { KerberoastingRule } from './rules/r030-kerberoasting.rule';
+import { AsrepRoastingRule } from './rules/r031-asrep-roasting.rule';
+import { DcsyncRule } from './rules/r032-dcsync.rule';
 import { ATTACK_CORRELATION_RULES } from './rules/attack-correlation.rules';
 import type {
   DetectionRule,
@@ -92,6 +95,9 @@ export class CorrelationService {
     new DnsTunnelingRule(),
     new DataStagingRule(),
     new FirewallModificationRule(),
+    new KerberoastingRule(),
+    new AsrepRoastingRule(),
+    new DcsyncRule(),
   ];
 
   /** Layer-2 attack correlation rules (C001–C003) — run after event rules */

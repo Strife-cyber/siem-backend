@@ -810,13 +810,18 @@
       ]
     }
   ],
-  "assertions": [
-    {
-      "type": "min_incidents",
-      "rule_id": "R003",
-      "min_severity": "CRITICAL",
-      "min_count": 1
-    }
-  ],
-  "base_time": "2026-11-13T13:00:00Z"
+  "base_time": "2026-11-13T13:00:00Z",
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "R003",
+        "min_severity": "CRITICAL",
+        "min_count": 1
+      }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [],
+    "expect_soar_actions": []
+  }
 }

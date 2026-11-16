@@ -1,0 +1,40 @@
+{
+  "name": "r031-asrep-roasting",
+  "description": "R031: AS-REP Roasting (T1558.004) — sweep of 3 accounts requesting TGTs without pre-authentication (4768 PreAuthType=0) from the attacker IP; must create an R031 CRITICAL incident and queue block_ip for analyst approval (CONFIRM).",
+  "base_time": "2026-11-16T11:00:00Z",
+  "requires_rules": ["R031"],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "SRV-DC-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4768</EventID></System><EventData><Data Name=\"TargetUserName\">roastable1</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"PreAuthType\">0</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0x0</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 5,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4768</EventID></System><EventData><Data Name=\"TargetUserName\">roastable2</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"PreAuthType\">0</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0x0</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 10,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4768</EventID></System><EventData><Data Name=\"TargetUserName\">roastable3</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"PreAuthType\">0</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0x0</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R031", "min_severity": "CRITICAL", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      { "playbook_name": "block_ip", "status": "PENDING", "min_count": 1 }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "entity_value": "192.168.189.50", "min_score": 20 }
+    ]
+  }
+}

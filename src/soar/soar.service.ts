@@ -216,11 +216,15 @@ export class SoarService {
       }
 
       case 'isolate_endpoint': {
-        if (hosts.length === 0)
-          return { skipped: true, reason: 'no hosts to isolate' };
+        // Hostnames are preferred; for IP-only incidents (e.g. AD Kerberos
+        // attacks observed on a DC) fall back to the incident IPs. The
+        // playbook refuses protected infrastructure IPs either way.
+        const targets = hosts.length > 0 ? hosts : ips;
+        if (targets.length === 0)
+          return { skipped: true, reason: 'no hosts or IPs to isolate' };
         const result = await isolateHostPlaybook(
           this.agent,
-          hosts,
+          targets,
           'Suspicious host detected',
           this.logger,
         );

@@ -21,4 +21,12 @@ export interface EnrichedLog extends NormalizedLog {
   protocol?: string;
   duration_seconds?: number;
   rule_name?: string;
+  /** Kerberos/AD fields (events 4768, 4769, 4662, 4624) — see AD playbook */
+  preauth_type?: number;
+  ticket_encryption_type?: string;
+  spn?: string;
+  logon_id?: string;
+  subject_user_name?: string;
+  status_code?: string;
+  replication_right?: boolean;
 }
