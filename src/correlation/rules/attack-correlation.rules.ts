@@ -612,6 +612,118 @@ const ReconToDataTransferRule = bridgedSequenceCorrelation({
   response: { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
 });
 
+/**
+ * C012 — AD Kerberos attack chain (ARNO_SIEM AD playbook)
+ *
+ * Pattern A: R030 (Kerberoasting) or R031 (AS-REP Roasting) followed within
+ * 24 h by R008 (successful login after failures) from the same attacker IP —
+ * the cracked credentials being used. Pattern B: an R032 (DCSync) incident
+ * alone, which already proves domain-wide credential access.
+ *
+ * Both escalate to CRITICAL with two CONFIRM responses: isolate_endpoint
+ * (attacker IP) and disable_account (compromised accounts). One C012 incident
+ * per stage-1 incident (deduped against existing C012 incidents across cycles,
+ * since the 24 h window far exceeds the generic 5-minute duplicate window).
+ *
+ * related_entities.hosts is deliberately EMPTY: the AD events are logged on
+ * the DC, so R008 carries the DC hostname — unioning hosts would aim
+ * isolate_endpoint at the domain controller. Containment targets the
+ * attacker IP only (the playbook's "never isolate the DC" rule).
+ */
+export class AdAttackChainRule implements AttackCorrelationRule {
+  readonly id = 'C012';
+  readonly name = 'AD Kerberos Attack Chain';
+  private static readonly WINDOW_MS = 24 * 60 * 60 * 1000;
+  private static readonly LOOKBACK_MS = 25 * 60 * 60 * 1000;
+
+  async detect(
+    prisma: PrismaService,
+    _since: Date,
+  ): Promise<AttackCorrelationResult[]> {
+    const lookback = new Date(Date.now() - AdAttackChainRule.LOOKBACK_MS);
+    const incidents = await loadIncidents(prisma, lookback, [
+      'R030',
+      'R031',
+      'R032',
+      'R008',
+    ]);
+    const existing = await loadIncidents(prisma, lookback, ['C012']);
+
+    const roastings = incidents.filter(
+      (i) => i.rule_id === 'R030' || i.rule_id === 'R031',
+    );
+    const dcsyncs = incidents.filter((i) => i.rule_id === 'R032');
+    const logins = incidents.filter((i) => i.rule_id === 'R008');
+
+    const alreadyCorrelated = (s1: IncidentRow): boolean =>
+      existing.some(
+        (c) =>
+          c.triggered_at >= s1.triggered_at &&
+          (overlap(ipsOf(c), ipsOf(s1)) || overlap(usersOf(c), usersOf(s1))),
+      );
+
+    const results: AttackCorrelationResult[] = [];
+    const fired = new Set<string>();
+
+    const build = (
+      s1: IncidentRow,
+      s2: IncidentRow | null,
+      pattern: 'roasting-then-login' | 'dcsync',
+    ): AttackCorrelationResult => ({
+      rule_id: this.id,
+      rule_name: this.name,
+      severity: 'CRITICAL',
+      confidence_score: 92,
+      summary:
+        pattern === 'dcsync'
+          ? `AD domain compromise: DCSync (${s1.rule_id}) — directory ` +
+            `replication rights abused; isolate attacker and disable ` +
+            `compromised accounts`
+          : `AD attack chain: ${s1.rule_id} followed by successful login ` +
+            `(${s2?.rule_id}) from the same attacker IP within 24 hours — ` +
+            `cracked credentials in use; isolate attacker and disable accounts`,
+      related_entities: {
+        ips: union(ipsOf(s1), s2 ? ipsOf(s2) : []),
+        users: union(usersOf(s1), s2 ? usersOf(s2) : []),
+        hosts: [],
+      },
+      prerequisite_incident_ids: s2 ? [s1.id, s2.id] : [s1.id],
+      responses: [
+        { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+        { playbook: 'disable_account', mode: 'CONFIRM' },
+      ],
+    });
+
+    // Pattern B — DCSync alone proves domain compromise
+    for (const d of dcsyncs) {
+      if (fired.has(d.id) || alreadyCorrelated(d)) continue;
+      fired.add(d.id);
+      results.push(build(d, null, 'dcsync'));
+    }
+
+    // Pattern A — roasting followed by successful use of credentials
+    for (const s1 of roastings) {
+      if (fired.has(s1.id) || alreadyCorrelated(s1)) continue;
+      const s1Ips = ipsOf(s1);
+      if (s1Ips.length === 0) continue;
+      const s2 = logins
+        .filter(
+          (l) =>
+            l.triggered_at >= s1.triggered_at &&
+            l.triggered_at.getTime() - s1.triggered_at.getTime() <=
+              AdAttackChainRule.WINDOW_MS &&
+            overlap(ipsOf(l), s1Ips),
+        )
+        .sort((a, b) => a.triggered_at.getTime() - b.triggered_at.getTime())[0];
+      if (!s2) continue;
+      fired.add(s1.id);
+      results.push(build(s1, s2, 'roasting-then-login'));
+    }
+
+    return results;
+  }
+}
+
 export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   new ReconToAccessRule(),
   new BruteForceToCompromiseRule(),
@@ -623,4 +735,5 @@ export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   StagingToExfiltrationRule,
   DefenseEvasionToExfilRule,
   ReconToDataTransferRule,
+  new AdAttackChainRule(),
 ];

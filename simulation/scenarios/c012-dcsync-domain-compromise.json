@@ -1,0 +1,37 @@
+{
+  "name": "c012-dcsync-domain-compromise",
+  "description": "C012 pattern B (ARNO_SIEM AD playbook): DCSync (R032, 4662 replication rights after a 4624 logon from the attacker IP) alone proves domain compromise — must create a C012 CRITICAL incident and queue isolate_endpoint + disable_account for analyst approval (CONFIRM).",
+  "base_time": "2026-11-16T15:00:00Z",
+  "requires_rules": ["R032", "C012"],
+  "sources": [
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "SRV-DC-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4624</EventID></System><EventData><Data Name=\"TargetUserName\">attacker</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"TargetLogonId\">0x3e7</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 8,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4662</EventID></System><EventData><Data Name=\"SubjectUserName\">attacker</Data><Data Name=\"SubjectDomainName\">CORP</Data><Data Name=\"SubjectLogonId\">0x3e7</Data><Data Name=\"ObjectName\">-</Data><Data Name=\"Properties\">{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}</Data><Data Name=\"IpAddress\">-</Data><Data Name=\"Status\">0x0</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "C012", "min_severity": "CRITICAL", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 },
+      { "playbook_name": "disable_account", "status": "PENDING", "min_count": 1 }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "value": "192.168.189.50", "min_score": 20 }
+    ]
+  }
+}

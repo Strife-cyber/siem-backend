@@ -1,10 +1,20 @@
-import { sequenceCorrelation } from './attack-correlation.rules';
+import {
+  AdAttackChainRule,
+  sequenceCorrelation,
+} from './attack-correlation.rules';
 import type { PrismaService } from '../../prisma/prisma.service';
 
 function fakePrisma(incidents: Array<Record<string, unknown>>): PrismaService {
   return {
     incident: {
-      findMany: jest.fn().mockResolvedValue(incidents),
+      findMany: jest.fn().mockImplementation((q: any) => {
+        const ids: string[] = q?.where?.rule_id?.in ?? [];
+        return Promise.resolve(
+          incidents.filter(
+            (i) => ids.length === 0 || ids.includes(i.rule_id as string),
+          ),
+        );
+      }),
     },
   } as unknown as PrismaService;
 }
@@ -130,5 +140,87 @@ describe('sequenceCorrelation', () => {
     const results = await rule.detect(fakePrisma(incidents), since);
     expect(results).toHaveLength(1);
     expect(results[0].prerequisite_incident_ids).toEqual(['s', 'y']);
+  });
+});
+
+describe('AdAttackChainRule (C012)', () => {
+  const rule = new AdAttackChainRule();
+  const since = new Date(Date.UTC(2026, 10, 13, 11, 0, 0));
+
+  it('pattern A: roasting followed by successful login from the same IP', async () => {
+    const incidents = [
+      incident('r030', 'R030', 0, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+      incident('r008', 'R008', 10, {
+        ips: ['192.168.189.50'],
+        users: ['svc_sql'],
+        hosts: ['srv-dc-01'],
+      }),
+    ];
+    const results = await rule.detect(fakePrisma(incidents), since);
+    expect(results).toHaveLength(1);
+    expect(results[0].severity).toBe('CRITICAL');
+    expect(results[0].prerequisite_incident_ids).toEqual(['r030', 'r008']);
+    expect(results[0].related_entities?.hosts).toEqual([]);
+    expect(results[0].responses).toEqual([
+      { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+      { playbook: 'disable_account', mode: 'CONFIRM' },
+    ]);
+  });
+
+  it('pattern B: DCSync alone escalates to C012', async () => {
+    const incidents = [
+      incident('r032', 'R032', 0, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+    ];
+    const results = await rule.detect(fakePrisma(incidents), since);
+    expect(results).toHaveLength(1);
+    expect(results[0].prerequisite_incident_ids).toEqual(['r032']);
+    expect(results[0].responses).toHaveLength(2);
+  });
+
+  it('does not fire without a subsequent login from the attacker IP', async () => {
+    const incidents = [
+      incident('r030', 'R030', 0, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+      incident('r008-other', 'R008', 10, {
+        ips: ['192.168.189.99'],
+        users: ['svc_sql'],
+        hosts: ['srv-dc-01'],
+      }),
+    ];
+    const results = await rule.detect(fakePrisma(incidents), since);
+    expect(results).toHaveLength(0);
+  });
+
+  it('does not re-fire while a C012 incident for the same attacker exists', async () => {
+    const incidents = [
+      incident('r030', 'R030', 0, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+      incident('r008', 'R008', 10, {
+        ips: ['192.168.189.50'],
+        users: ['svc_sql'],
+        hosts: ['srv-dc-01'],
+      }),
+      incident('c012-prev', 'C012', 11, {
+        ips: ['192.168.189.50'],
+        users: ['attacker'],
+        hosts: [],
+      }),
+    ];
+    const results = await rule.detect(fakePrisma(incidents), since);
+    expect(results).toHaveLength(0);
   });
 });

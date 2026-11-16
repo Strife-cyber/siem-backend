@@ -535,15 +535,17 @@ export class CorrelationService {
       // Entity graph + risk for the correlation itself
       await this.recordEntitiesAndRisk(incident.id, result);
 
-      if (result.response) {
+      const responses =
+        result.responses ?? (result.response ? [result.response] : []);
+      for (const response of responses) {
         this.logger.log(
-          `  [SOAR] Triggering playbook "${result.response.playbook}" (${result.response.mode}) for incident ${incident.id}`,
+          `  [SOAR] Triggering playbook "${response.playbook}" (${response.mode}) for incident ${incident.id}`,
         );
         await this.soar
           .executePlaybook({
             incident_id: incident.id,
-            playbook_name: result.response.playbook,
-            mode: result.response.mode,
+            playbook_name: response.playbook,
+            mode: response.mode,
           })
           .catch((err) => {
             this.logger.error(
