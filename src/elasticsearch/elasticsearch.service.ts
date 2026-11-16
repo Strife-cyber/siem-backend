@@ -230,6 +230,13 @@ export class ElasticsearchService implements OnModuleInit {
           },
           status_code: { type: 'keyword' },
           replication_right: { type: 'boolean' },
+          // ---- ARP/DHCP MITM fields ----
+          arp_usurped_ip: { type: 'ip' },
+          arp_mac_old: { type: 'keyword' },
+          arp_mac_new: { type: 'keyword' },
+          arp_iface: { type: 'keyword' },
+          dhcp_server_ip: { type: 'ip' },
+          dhcp_offered_ip: { type: 'ip' },
         },
       });
     } catch (error) {
@@ -278,6 +285,13 @@ export class ElasticsearchService implements OnModuleInit {
           subject_user_name: { type: 'keyword' },
           status_code: { type: 'keyword' },
           replication_right: { type: 'boolean' },
+          // ---- ARP/DHCP MITM fields ----
+          arp_usurped_ip: { type: 'ip' },
+          arp_mac_old: { type: 'keyword' },
+          arp_mac_new: { type: 'keyword' },
+          arp_iface: { type: 'keyword' },
+          dhcp_server_ip: { type: 'ip' },
+          dhcp_offered_ip: { type: 'ip' },
         },
       });
       this.logger.log(
