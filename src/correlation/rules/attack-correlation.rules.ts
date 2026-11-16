@@ -369,22 +369,37 @@ function findChain(
     for (const i of sorted) {
       if (used.has(i.id)) continue;
       if (!cfg.stages[stage].includes(i.rule_id ?? '')) continue;
-      if (cfg.ordered) {
-        // Stage order follows the underlying EVENT times, not triggered_at:
-        // incidents created in one cycle are timestamped in rule-execution
-        // order (R008 runs before R026-R028), which would invert same-cycle
-        // chains. Fall back to triggered_at when an incident has no events.
-        const cur = bounds?.get(cursor.id);
-        const cand = bounds?.get(i.id);
-        const cursorT = cur?.last ?? cursor.triggered_at.getTime();
-        const candT = cand?.first ?? i.triggered_at.getTime();
-        if (candT < cursorT) continue;
-      }
-      if (
-        Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
-        WINDOW_MS
-      ) {
-        continue;
+      const cur = bounds?.get(cursor.id);
+      const cand = bounds?.get(i.id);
+      if (cur && cand) {
+        // Both incidents have stored events: order and window on EVENT
+        // times. triggered_at is cycle-granular in rule-execution order
+        // (R008 runs before R026-R028), which would invert same-cycle
+        // chains. The candidate's stage time is its first SUCCESS event
+        // when present (R008 evidence mixes pre-MITM failures with the
+        // post-MITM successful login), else its first event; the cursor's
+        // is its last event.
+        const cursorT = cur.last;
+        const candT = cand.successTimes.length
+          ? Math.min(...cand.successTimes)
+          : cand.first;
+        if (cfg.ordered && candT < cursorT) continue;
+        if (candT - cursorT > WINDOW_MS) continue;
+      } else {
+        // Missing event bounds: fall back to triggered_at for BOTH sides
+        // (mixing event and creation times would compare different clocks
+        // and silently drop valid chains).
+        if (
+          cfg.ordered &&
+          i.triggered_at.getTime() < cursor.triggered_at.getTime()
+        )
+          continue;
+        if (
+          Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
+          WINDOW_MS
+        ) {
+          continue;
+        }
       }
       if (!chain.every((c) => share(c, i))) continue;
       chain.push(i);
