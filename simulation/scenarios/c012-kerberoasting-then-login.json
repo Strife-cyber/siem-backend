@@ -1,7 +1,7 @@
 {
   "name": "c012-kerberoasting-then-login",
   "description": "C012 pattern A (ARNO_SIEM AD playbook): Kerberoasting (R030, 3 RC4 service tickets) followed within 24h by successful use of the cracked credentials (R008: 5 failures then success for svc_sql from the same attacker IP). Must create a C012 CRITICAL incident and queue isolate_endpoint + disable_account for analyst approval (CONFIRM).",
-  "base_time": "2026-11-16T14:00:00Z",
+  "base_time": "2026-11-16T10:00:00Z",
   "requires_rules": ["R030", "R008", "C012"],
   "sources": [
     {

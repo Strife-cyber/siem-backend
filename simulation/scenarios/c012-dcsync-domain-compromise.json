@@ -1,7 +1,7 @@
 {
   "name": "c012-dcsync-domain-compromise",
   "description": "C012 pattern B (ARNO_SIEM AD playbook): DCSync (R032, 4662 replication rights after a 4624 logon from the attacker IP) alone proves domain compromise — must create a C012 CRITICAL incident and queue isolate_endpoint + disable_account for analyst approval (CONFIRM).",
-  "base_time": "2026-11-16T15:00:00Z",
+  "base_time": "2026-11-16T10:30:00Z",
   "requires_rules": ["R032", "C012"],
   "sources": [
     {
