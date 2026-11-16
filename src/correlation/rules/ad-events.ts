@@ -79,25 +79,26 @@ export async function resolveLogonSourceIp(
 ): Promise<string | undefined> {
   if (!logonId) return undefined;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const filters: any[] = [
+    { terms: { source_type: ['windows_security', 'active_directory'] } },
+    { term: { event_id: 4624 } },
+    { term: { logon_id: logonId } },
+    {
+      range: {
+        normalized_at: {
+          gte: since.toISOString(),
+        },
+      },
+    },
+  ];
+  // Scope at query level: logon IDs are computer-local and the hit cap must
+  // apply per controller, otherwise ten newer sessions on other DCs would
+  // push this host's matching 4624 out of the window.
+  if (hostname) filters.push({ term: { hostname } });
   const result = await es.getClient().search({
     index: 'ctu-logs',
     size: 10,
-    query: {
-      bool: {
-        filter: [
-          { terms: { source_type: ['windows_security', 'active_directory'] } },
-          { term: { event_id: 4624 } },
-          { term: { logon_id: logonId } },
-          {
-            range: {
-              normalized_at: {
-                gte: since.toISOString(),
-              },
-            },
-          },
-        ],
-      },
-    },
+    query: { bool: { filter: filters } },
     sort: [{ normalized_at: 'desc' }],
   });
   const hits = (result.hits.hits as Array<{ _source: AdHit }>).map(
