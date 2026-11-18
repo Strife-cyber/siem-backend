@@ -359,6 +359,7 @@ function findChain(
   cfg: SequenceStageConfig,
   sorted: IncidentRow[],
   share: ShareEntityPredicate,
+  bounds?: Map<string, EventBounds>,
 ): IncidentRow[] | null {
   const chain: IncidentRow[] = [start];
   const used = new Set<string>([start.id]);
@@ -368,16 +369,37 @@ function findChain(
     for (const i of sorted) {
       if (used.has(i.id)) continue;
       if (!cfg.stages[stage].includes(i.rule_id ?? '')) continue;
-      if (
-        cfg.ordered &&
-        i.triggered_at.getTime() < cursor.triggered_at.getTime()
-      )
-        continue;
-      if (
-        Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
-        WINDOW_MS
-      ) {
-        continue;
+      const cur = bounds?.get(cursor.id);
+      const cand = bounds?.get(i.id);
+      if (cur && cand) {
+        // Both incidents have stored events: order and window on EVENT
+        // times. triggered_at is cycle-granular in rule-execution order
+        // (R008 runs before R026-R028), which would invert same-cycle
+        // chains. The candidate's stage time is its first SUCCESS event
+        // when present (R008 evidence mixes pre-MITM failures with the
+        // post-MITM successful login), else its first event; the cursor's
+        // is its last event.
+        const cursorT = cur.last;
+        const candT = cand.successTimes.length
+          ? Math.min(...cand.successTimes)
+          : cand.first;
+        if (cfg.ordered && candT < cursorT) continue;
+        if (candT - cursorT > WINDOW_MS) continue;
+      } else {
+        // Missing event bounds: fall back to triggered_at for BOTH sides
+        // (mixing event and creation times would compare different clocks
+        // and silently drop valid chains).
+        if (
+          cfg.ordered &&
+          i.triggered_at.getTime() < cursor.triggered_at.getTime()
+        )
+          continue;
+        if (
+          Math.abs(i.triggered_at.getTime() - cursor.triggered_at.getTime()) >
+          WINDOW_MS
+        ) {
+          continue;
+        }
       }
       if (!chain.every((c) => share(c, i))) continue;
       chain.push(i);
@@ -423,10 +445,14 @@ export function sequenceCorrelation(
         }
       }
       const share = cfg.share ?? shareEntity;
+      // Event-time bounds for ordered rules (see findChain).
+      const bounds = cfg.ordered
+        ? await loadEventBounds(prisma, incidents.map((i) => i.id))
+        : undefined;
 
       for (const start of sorted) {
         if (!cfg.stages[0].includes(start.rule_id ?? '')) continue;
-        const chain = findChain(start, cfg, sorted, share);
+        const chain = findChain(start, cfg, sorted, share, bounds);
         if (!chain) continue;
 
         const key = chain.map((c) => c.id).join('|');
@@ -869,4 +895,41 @@ export const ATTACK_CORRELATION_RULES: AttackCorrelationRule[] = [
   DefenseEvasionToExfilRule,
   ReconToDataTransferRule,
   new AdAttackChainRule(),
+  /**
+   * C011 — MITM to account compromise (ARNO_SIEM MITM playbook):
+   * (R026 ARP spoofing | R027 rogue DHCP | R028 LLMNR/NBT-NS poisoning)
+   * followed by R008 (successful login after failures — the intercepted
+   * or relayed victim credentials being used) from the same attacker IP
+   * within 30 minutes → CRITICAL.
+   *
+   * isolate_endpoint + disable_account, both CONFIRM. dropHosts: R008
+   * carries the victim machine/DC hostname and isolate_endpoint prefers
+   * hosts — containment must aim at the attacker IP, never infrastructure.
+   */
+  sequenceCorrelation({
+    id: 'C011',
+    name: 'MITM to Account Compromise',
+    stages: [['R026', 'R027', 'R028'], ['R008']],
+    severity: 'CRITICAL',
+    confidence: 90,
+    summary: (chain) =>
+      `MITM precursor (${chain[0].rule_id ?? '?'}) followed by successful ` +
+      'login after failures from the same entity within 30min — possible ' +
+      'intercepted-credential use',
+    responses: [
+      { playbook: 'isolate_endpoint', mode: 'CONFIRM' },
+      { playbook: 'disable_account', mode: 'CONFIRM' },
+    ],
+    dropHosts: true,
+    // The playbook window is 30min measured from the MITM event; incidents
+    // arrive a cycle later, so look back 35min and require the MITM stage
+    // to precede the login. Same-IP-only sharing prevents unrelated
+    // username-only coincidences from chaining.
+    lookbackMs: 35 * 60 * 1000,
+    ordered: true,
+    share: (a, b) => {
+      const ips = (i: typeof a) => ipsOf(i);
+      return overlap(ips(a), ips(b));
+    },
+  }),
 ];

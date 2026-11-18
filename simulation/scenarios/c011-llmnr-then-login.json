@@ -1,0 +1,91 @@
+{
+  "name": "c011-llmnr-then-login",
+  "description": "C011 variant: LLMNR/NBT-NS poisoning (R028 HIGH, responder 192.168.189.50) followed within 30min by R008 successful login of victim account jsmith from the same IP. Must create C011 CRITICAL + both CONFIRM playbooks PENDING.",
+  "base_time": "2026-11-10T10:00:00Z",
+  "requires_rules": [
+    "R028",
+    "R008",
+    "C011"
+  ],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "pfsense",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 10 10:00:00 pfsense filterlog: 100,0,anchor1,20001,em0,match,pass,out,4,0x0,0,64,0,0,0,17,udp,60,192.168.189.50,192.168.189.11,5355,49152,0,0,0,0,0,0"
+        },
+        {
+          "offset_seconds": 120,
+          "raw": "Nov 10 10:00:02 pfsense filterlog: 100,0,anchor1,20002,em0,match,pass,out,4,0x0,0,64,0,0,0,17,udp,60,192.168.189.50,192.168.189.12,5355,49152,0,0,0,0,0,0"
+        },
+        {
+          "offset_seconds": 240,
+          "raw": "Nov 10 10:00:04 pfsense filterlog: 100,0,anchor1,20003,em0,match,pass,out,4,0x0,0,64,0,0,0,17,udp,60,192.168.189.50,192.168.189.13,137,49153,0,0,0,0,0,0"
+        }
+      ]
+    },
+    {
+      "source_type": "WINDOWS_SECURITY",
+      "hostname": "SRV-DC-01",
+      "lines": [
+        {
+          "offset_seconds": 300,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4625</EventID></System><EventData><Data Name=\"TargetUserName\">jsmith</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0xC000006A</Data><Data Name=\"SubStatus\">0x0</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 306,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4625</EventID></System><EventData><Data Name=\"TargetUserName\">jsmith</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0xC000006A</Data><Data Name=\"SubStatus\">0x0</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 312,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4625</EventID></System><EventData><Data Name=\"TargetUserName\">jsmith</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0xC000006A</Data><Data Name=\"SubStatus\">0x0</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 318,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4625</EventID></System><EventData><Data Name=\"TargetUserName\">jsmith</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0xC000006A</Data><Data Name=\"SubStatus\">0x0</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 324,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4625</EventID></System><EventData><Data Name=\"TargetUserName\">jsmith</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"Status\">0xC000006A</Data><Data Name=\"SubStatus\">0x0</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        },
+        {
+          "offset_seconds": 360,
+          "raw": "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"><System><Provider Name=\"Microsoft-Windows-Security-Auditing\"/><EventID>4624</EventID></System><EventData><Data Name=\"TargetUserName\">jsmith</Data><Data Name=\"TargetDomainName\">CORP</Data><Data Name=\"LogonType\">3</Data><Data Name=\"TargetLogonId\">0x3e9</Data><Data Name=\"IpAddress\">192.168.189.50</Data><Data Name=\"AuthenticationPackageName\">NTLM</Data></EventData></Event>"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      {
+        "rule_id": "C011",
+        "min_severity": "CRITICAL",
+        "min_count": 1
+      }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      {
+        "playbook_name": "isolate_endpoint",
+        "status": "PENDING",
+        "min_count": 1
+      },
+      {
+        "playbook_name": "disable_account",
+        "status": "PENDING",
+        "min_count": 1
+      }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      {
+        "entity_type": "IP",
+        "value": "192.168.189.50",
+        "min_score": 20
+      }
+    ]
+  }
+}

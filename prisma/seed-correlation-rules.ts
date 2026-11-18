@@ -748,6 +748,24 @@ const RULES = [
     confidence_weight: 92,
     is_active: false,
   },
+  {
+    id: 'C011',
+    name: 'MITM to Account Compromise',
+    tactic: 'TA0006',
+    technique: 'T1557+T1078',
+    definition: {
+      layer: 2,
+      prerequisite_rules: ['R026', 'R027', 'R028', 'R008'],
+      time_window_seconds: 1800,
+      stages: [['R026', 'R027', 'R028'], ['R008']],
+      response: {
+        playbook: 'isolate_endpoint+disable_account',
+        mode: 'CONFIRM',
+      },
+    },
+    confidence_weight: 90,
+    is_active: false,
+  },
 ];
 
 async function main() {
