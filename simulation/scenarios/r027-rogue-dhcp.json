@@ -1,0 +1,36 @@
+{
+  "name": "r027-rogue-dhcp",
+  "description": "R027 (ARNO_SIEM MITM playbook A33): a host outside DHCP_SERVERS_ALLOWED offers leases (dhclient DHCPOFFER/ACK) — HIGH, isolate_endpoint CONFIRM targets the rogue server 192.168.189.50. An offer from the authorized gateway 192.168.189.2 must NOT fire.",
+  "base_time": "2026-11-10T10:00:00Z",
+  "requires_rules": ["R027"],
+  "sources": [
+    {
+      "source_type": "LINUX_SYSLOG",
+      "hostname": "ws-01",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 10 10:00:00 ws-01 dhclient[1234]: DHCPOFFER of 192.168.189.60 from 192.168.189.50"
+        },
+        {
+          "offset_seconds": 60,
+          "raw": "Nov 10 10:01:00 ws-01 dhclient[1234]: DHCPOFFER of 192.168.189.61 from 192.168.189.2"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R027", "min_severity": "HIGH", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "value": "192.168.189.50", "min_score": 20 }
+    ]
+  }
+}

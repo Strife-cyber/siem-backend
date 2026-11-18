@@ -1,0 +1,36 @@
+{
+  "name": "r026-arp-spoofing",
+  "description": "R026 (ARNO_SIEM MITM playbook A32): pfSense reports a host claiming the gateway IP (arp motif B) — CRITICAL, isolate_endpoint CONFIRM must target the attacker's real IP 192.168.189.50, never the usurped gateway 192.168.189.2. A single MAC change on an unprotected IP must NOT fire (known NIC-swap false positive).",
+  "base_time": "2026-11-10T10:00:00Z",
+  "requires_rules": ["R026"],
+  "sources": [
+    {
+      "source_type": "FIREWALL",
+      "hostname": "pfsense",
+      "lines": [
+        {
+          "offset_seconds": 0,
+          "raw": "Nov 10 10:00:00 pfsense kernel: arp: 52:54:00:aa:bb:50 is using my IP address 192.168.189.2 on em1 from 192.168.189.50!"
+        },
+        {
+          "offset_seconds": 120,
+          "raw": "Nov 10 10:02:00 pfsense kernel: arp: 192.168.189.20 moved from 52:54:00:11:11:11 to 52:54:00:22:22:22 on em1"
+        }
+      ]
+    }
+  ],
+  "assert": {
+    "expect_incidents": [
+      { "rule_id": "R026", "min_severity": "CRITICAL", "min_count": 1 }
+    ],
+    "expect_no_incidents_for_rules": [],
+    "expect_no_high_or_critical_incidents": false,
+    "expect_playbook_executions": [
+      { "playbook_name": "isolate_endpoint", "status": "PENDING", "min_count": 1 }
+    ],
+    "expect_soar_actions": [],
+    "expect_entity_risk": [
+      { "entity_type": "IP", "value": "192.168.189.50", "min_score": 20 }
+    ]
+  }
+}

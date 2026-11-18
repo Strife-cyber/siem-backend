@@ -29,4 +29,11 @@ export interface EnrichedLog extends NormalizedLog {
   subject_user_name?: string;
   status_code?: string;
   replication_right?: boolean;
+  /** ARP/DHCP MITM fields (pfSense syslog, arpwatch, dhclient) — see MITM playbook */
+  arp_usurped_ip?: string;
+  arp_mac_old?: string;
+  arp_mac_new?: string;
+  arp_iface?: string;
+  dhcp_server_ip?: string;
+  dhcp_offered_ip?: string;
 }
