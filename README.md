@@ -170,6 +170,26 @@ Authorization: Bearer <access_token>
 | `ANALYST` | All READER permissions + update incidents, execute playbooks |
 | `ADMIN` | All ANALYST permissions + manage users, create/update/delete rules, configure retention |
 
+## Configuration — AD & MITM detection allowlists
+
+The AD Kerberos (R030–R032, C012) and MITM (R026–R029, C011) detections are
+tuned through environment variables (defaults in `docker-compose.yml`):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ARP_PROTECTED_IPS` | `192.168.189.2,192.168.189.10` | Gateway/DC IPs excluded from R026 containment entities |
+| `DHCP_SERVERS_ALLOWED` | `192.168.189.2` | Legitimate DHCP servers; any other offer source → R027 |
+| `NAME_SERVERS_ALLOWED` | `192.168.189.2,192.168.189.10` | Legitimate LLMNR/NBT-NS responders; others → R028 |
+| `AD_HONEY_ACCOUNTS` | — | Honey AD accounts (immediate detection on use) |
+| `AD_RC4_ALLOWED_SERVICES` | — | Service accounts allowed RC4 encryption (Kerberoasting noise control) |
+| `SOAR_FIREWALL_PROTECTED_IPS` / `SOAR_FIREWALL_PROTECTED_AD_DC_IP` | — | IPs playbooks refuse to block/isolate |
+
+Containment safety is enforced in code: the spoofed/usurped IP is never
+listed in incident entities, and protected IPs are refused by the SOAR
+layer. See the operator guide
+[`conception/detection-ad-mitm.md`](https://github.com/Strife-cyber/smart-siem_docs/blob/main/conception/detection-ad-mitm.md)
+in smart-siem_docs (prerequisites, tuning, never-block-spoofed-IP runbook).
+
 ## Project Structure
 
 ```
